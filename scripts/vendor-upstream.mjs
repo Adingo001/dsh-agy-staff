@@ -71,8 +71,11 @@ if (dryRun) {
     process.exit(0);
 }
 
-await rm(assets, { recursive: true, force: true });
-await mkdir(path.join(root, 'assets'), { recursive: true });
+// Only clear what upstream owns: assets/logo and assets/badges are ours.
+for (const relative of [...plan, 'UPSTREAM-LICENSE', 'UPSTREAM-COMMIT']) {
+    await rm(path.join(assets, relative), { recursive: true, force: true });
+}
+await mkdir(assets, { recursive: true });
 
 for (const relative of plan) {
     const source = path.join(upstream, relative);
