@@ -1,0 +1,8 @@
+# generated job state if you run the companion from here
+.agy-staff/
+
+# local scratch
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
