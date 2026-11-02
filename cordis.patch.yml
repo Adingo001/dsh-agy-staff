@@ -1,0 +1,7 @@
+# dsh-agy-staff bundle patch.
+#
+# The row owns no host services of its own: it injects `skills` and registers one
+# provider that serves the seven vendored agy personas as /agy-* skills.
+- insert:
+    - id: dsh-agy-staff
+      name: dsh-agy-staff

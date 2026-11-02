@@ -1,0 +1,44 @@
+{
+  "name": "dsh-agy-staff",
+  "version": "0.1.0",
+  "description": "Hire Google's Antigravity CLI (agy) from DeepSeek Harness: seven /agy-* skills — ask, staffer, researcher, reviewer, implementer, lead, jobs.",
+  "license": "MIT",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "cordis.patch.yml",
+    "assets",
+    "README.md",
+    "README.zh-CN.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "scripts": {
+    "test": "node --test test/",
+    "vendor": "node scripts/vendor-upstream.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "dsh-bundle",
+    "deepseek-harness",
+    "agy",
+    "agy-staff",
+    "antigravity",
+    "gemini",
+    "skills"
+  ]
+}

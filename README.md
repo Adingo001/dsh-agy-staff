@@ -4,57 +4,65 @@
 
 <p align="center"><img src="assets/badges/host-dsh.svg" height="20" alt="host: DeepSeek Harness"> <img src="assets/badges/worker-agy.svg" height="20" alt="worker: agy / Gemini 3.8 Flash"> <img src="assets/badges/license-mit.svg" height="20" alt="license: MIT"> <img src="assets/badges/upstream-agy-staff.svg" height="20" alt="upstream: keli-wen/agy-staff"></p>
 
-<p align="center">Install <a href="https://github.com/keli-wen/agy-staff">agy-staff</a>'s personas as DeepSeek Harness skills — <code>/agy-ask</code>, <code>/agy-staffer</code>, <code>/agy-researcher</code>, <code>/agy-reviewer</code>, <code>/agy-implementer</code>, plus <code>/agy-lead</code> and <code>/agy-jobs</code>.</p>
+<p align="center">A DeepSeek Harness bundle that hires <a href="https://github.com/keli-wen/agy-staff">agy-staff</a>'s personas as seven skills — <code>/agy-ask</code>, <code>/agy-staffer</code>, <code>/agy-researcher</code>, <code>/agy-reviewer</code>, <code>/agy-implementer</code>, plus <code>/agy-lead</code> and <code>/agy-jobs</code>.</p>
 
-**[Why](#-why) · [Install](#install) · [Usage](#cujs) · [Core design](#core-design) · [Troubleshooting](#troubleshooting) · [Credits](#credits)**
+**[Why](#-why) · [Install](#install) · [Usage](#cujs) · [Core design](#core-design) · [Updating](#updating) · [Troubleshooting](#troubleshooting) · [Credits](#credits)**
 
 ## What & Why
 
-[agy-staff](https://github.com/keli-wen/agy-staff) hires Google's Antigravity CLI (`agy`, Gemini 3.8 Flash) as a fast staffer for Claude Code, Codex, Pi and OpenCode. A senior agent hands it a survey, a review, or a scoped implementation, and gets a second model family back in seconds instead of grinding the same code itself.
+[agy-staff](https://github.com/keli-wen/agy-staff) hires Google's Antigravity CLI (`agy`, Gemini 3.8 Flash) as staff: the host agent hands out a survey, a review, or a scoped implementation, and gets a second model family back in seconds instead of grinding the same work itself. It ships as plugins for Claude Code, Codex, Pi and OpenCode.
 
-**DeepSeek Harness is not one of the hosts it targets.** dsh has no plugin marketplace line like `claude plugin install`, no `/agy:` namespace, and no `$agy` skill picker. It does have a skills system: a SKILL.md bundle per skill, discovered from a filesystem root, invocable by the model through the `skill` tool and by you through `/name` in the composer.
+DeepSeek Harness is not one of those hosts. **dsh plugins are cordis bundles**, not host plugin manifests, and dsh has no `/agy:` namespace: its composer menu matches the skill *name* from frontmatter, discovered through a registered **skill provider**. So this repo is not an installer script that copies files around — it is a dsh bundle that registers one provider serving the vendored personas:
 
-This repo is the thin adapter between the two. It does not fork agy-staff and vendors none of its code: it reads your upstream checkout and publishes prefixed copies of the personas where dsh will find them.
+```
+dsh-agy-staff (bundle patch)
+  └── row: dsh-agy-staff  (inject: ['skills'])
+        └── ctx.skills.registerProvider(...)
+              └── /agy-ask  /agy-staffer  /agy-researcher  /agy-reviewer
+                  /agy-implementer  /agy-lead  /agy-jobs
+```
 
-| | Claude Code / Codex | DeepSeek Harness (this repo) |
+Nothing is written into `~/.dsh/skills`, nothing is junctioned, and no upstream checkout is required at runtime: the personas, the companion and the reference docs ship inside the package under `assets/`.
+
+| | Claude Code / Codex | DeepSeek Harness (this bundle) |
 |---|---|---|
-| Surface | `/agy:ask`, `$agy:ask` | `/agy-ask` |
-| Discovery | plugin manifest | `<dshHome>/skills/<name>/SKILL.md` |
-| Shared resources | `<plugin-root>/companion` | junctions at `<dshHome>/companion`, `<dshHome>/docs` |
-| Background jobs | host-specific wait | companion `wait` as a dsh background command |
+| Install | `claude plugin install …` | `dsh plugin --profile <p> add …` |
+| Surface | `/agy:ask` | `/agy-ask` |
+| Skill delivery | plugin manifest | `ctx.skills.registerProvider` |
+| Shared resources | `<plugin-root>/companion` | `resourceBase` → `<pkg>/assets/` |
+| Taking effect | next session | **restart the app** (bundles load at host start) |
 
 ## Install
 
-**Step 1 — prerequisites.** Node.js (the companion is a Node script) and the [Antigravity CLI](https://antigravity.google/docs/cli/install):
+**Step 1 — the worker.** Node.js and the [Antigravity CLI](https://antigravity.google/docs/cli/install), logged in once:
 
 ```bash
 curl -fsSL https://antigravity.google/cli/install.sh | bash
 agy --version
 ```
 
-On Windows the CLI installer drops `agy.exe` under `%LOCALAPPDATA%\agy\bin`; make sure that directory is on `PATH`.
+On Windows the installer puts `agy.exe` under `%LOCALAPPDATA%\agy\bin`; keep that on `PATH`.
 
-**Step 2 — clone this repo and run the installer.** It locates an agy-staff checkout (or clones one to `~/agy-staff`), then publishes seven skills into `~/.dsh/skills`:
+**Step 2 — install the bundle into a profile.** `dsh plugin` forwards to pnpm in the profile directory and registers the bundle in `dsh.profile.bundles`:
 
 ```powershell
 git clone https://github.com/Adingo001/dsh-agy-staff.git
-cd dsh-agy-staff
-pwsh -File install.ps1                      # add -Check for a dry run
+dsh plugin --profile desktop add "link:$PWD/dsh-agy-staff"
 ```
 
-Already have a checkout somewhere? Point at it and nothing is cloned:
+Or straight from GitHub, if you would rather not keep a clone:
 
 ```powershell
-pwsh -File install.ps1 -Upstream D:\project\agy-staff
+dsh plugin --profile desktop add "github:Adingo001/dsh-agy-staff"
 ```
 
-**Step 3 — smoke test.** `ask` is tool-free, so it needs no setup and answers in about three seconds:
+**Step 3 — restart DeepSeek Harness.** A skill *directory* is picked up live; a new bundle row is not. Quit the app and open it again, then type `/agy` in the composer: seven rows.
+
+**Step 4 — smoke test.** `ask` is tool-free, so it needs no setup and answers in about three seconds:
 
 ```powershell
-node "$HOME\.dsh\companion\agy-companion.mjs" ask --prompt "reply with OK"
+node "$env:USERPROFILE\.dsh\profiles\desktop\node_modules\dsh-agy-staff\assets\companion\agy-companion.mjs" ask --prompt "reply with OK"
 ```
-
-Then type `/agy` in the composer: seven rows, no restart needed — dsh watches the skills root and republishes its catalog.
 
 ## CUJs
 
@@ -71,64 +79,56 @@ Then type `/agy` in the composer: seven rows, no restart needed — dsh watches 
 | Orchestrate a task | `/agy-lead investigate the options, draft a proposal, then revise it with my feedback` |
 | Job ops | `/agy-jobs`, or just "is the agy job done?" |
 
-Only `ask` blocks; the rest return a job id and the companion's `wait` collects the report. In dsh, run that `wait` as a background command so the host keeps working — one wait per job, `exit 2` means still running.
+Only `ask` blocks. The rest return a job id; the companion's `wait` collects the report, and in dsh you run that `wait` as a background command so the host keeps working — one wait per job, `exit 2` means still running.
 
 ## Core design
 
-Three layers, one of which is code:
+- **One provider, seven candidates.** `index.js` parses the vendored `assets/skills/<persona>/SKILL.md` frontmatter, serves the body as skill content, and reports `rank: 600` (the packaged-provider precedence). It has no dependencies — Node builtins only.
+- **Name prefix is load-bearing.** dsh has no colon namespace; `/agy` only lists something if the *name* starts with `agy`. The bundle therefore serves `agy-<persona>` while the on-disk directory keeps upstream's `ask`/`jobs`, so `../jobs/SKILL.md` still resolves as written.
+- **`resourceBase` replaces junctions.** Every candidate advertises `{ kind: 'directory', path: <pkg>/assets }`; dsh tells the model to resolve relative references against that base, so `../../companion/agy-companion.mjs`, `../jobs/references/setup.md` and `../../docs/REFERENCE.md` work untouched.
+- **Prose is localized at load.** Upstream bodies say `/agy:ask`; the provider rewrites that to `/agy-ask` in descriptions and bodies, leaving the vendored files byte-identical to upstream.
+- **Upstream is vendored, not copied at install.** `assets/` holds the personas, companion, templates and reference docs at the commit recorded in `assets/UPSTREAM-COMMIT`; `NOTICE` spells out what came from where.
 
-1. **Upstream personas** — `skills/<persona>/SKILL.md` in agy-staff, plus `companion/agy-companion.mjs` (Node stdlib only) and `templates/`.
-2. **`build-skills.ps1`** — the adapter. For each persona it copies the tree to `<dshHome>/skills/agy-<persona>`, rewrites `name: <persona>` to `name: agy-<persona>`, and rewrites cross-skill links (`../jobs/` → `../agy-jobs/`, `../reviewer/` → `../agy-reviewer/`). It also keeps two junctions so `../../companion` and `../../docs` resolve exactly as upstream expects.
-3. **dsh skills provider** — watches `<dshHome>/skills` one level deep, parses frontmatter, and republishes the catalog when a bundle appears, changes, or disappears.
+## Updating
 
-Four things worth knowing before you edit it:
-
-- **Copies, not junctions, for the skills themselves.** dsh matches `/` queries against the skill *name* inside frontmatter, so the prefix has to be in the file. Junctions would keep the name `ask` and nothing would answer `/agy`.
-- **Junctions for the resources.** `../../companion` must resolve from `<dshHome>/skills/agy-ask`, which lands on `<dshHome>/companion` — a junction to the upstream checkout keeps it live across `git pull`.
-- **Names are kebab-case and flat.** There is no colon namespace, so `/agy:ask` is not a thing here; `agy-ask` is.
-- **Generated directories are adopted, not clobbered.** The script records what it generated in `<dshHome>/.agy-staff-skills.json`, prunes personas upstream removed, and refuses to overwrite a directory it did not create.
-
-Windows specifics: PowerShell 7 required, junctions created with `New-Item -ItemType Junction`, links removed through `DirectoryInfo.Delete()` so a delete never recurses into the upstream checkout. The companion itself handles `win32` (PowerShell CIM process identity) upstream.
-
-## Upgrade
+Upstream moved:
 
 ```powershell
-git -C "$HOME\agy-staff" pull          # or wherever your checkout lives
-pwsh -File build-skills.ps1 -Upstream "$HOME\agy-staff"
+git -C <agy-staff-checkout> pull
+node scripts/vendor-upstream.mjs --from <agy-staff-checkout>
+npm test
 ```
 
-Re-running is idempotent; `-Check` prints the plan and writes nothing.
+Then restart the app. `scripts/vendor-upstream.mjs` copies the payload, rewrites `assets/UPSTREAM-COMMIT`, and warns when a path upstream dropped is missing.
 
-## Uninstall
+This bundle itself:
 
 ```powershell
-Remove-Item "$HOME\.dsh\skills\agy-*" -Recurse -Force
-Remove-Item "$HOME\.dsh\companion", "$HOME\.dsh\docs"        # junctions only
-Remove-Item "$HOME\.dsh\.agy-staff-skills.json"
+git pull
+dsh plugin --profile desktop add "link:$PWD"   # re-link after a move
 ```
-
-Removing a junction this way deletes the link, not the checkout it points at.
 
 ## Troubleshooting
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `/agy` lists nothing | skills root not scanned, or names not prefixed | check `~/.dsh/skills/agy-ask/SKILL.md` exists and its frontmatter says `name: agy-ask` |
+| `/agy` lists nothing | bundle row not loaded | check `dsh-agy-staff` is in the profile's `dsh.profile.bundles`, then restart the app |
+| Warning: duplicate skill `agy-ask` | an older filesystem install is still in `~/.dsh/skills` | delete `~/.dsh/skills/agy-*` (the bundle takes over) |
 | `unknown subcommand: researcher` | companion modes are `research` / `review` / `implement` | call the mode, not the skill directory name |
-| `ask` hangs or 401 | agy needs localhost plus its OAuth token file | run unsandboxed; `agy` must be logged in |
-| `install.ps1` refuses a directory | the target existed before this script | move it away, or delete `<dshHome>/.agy-staff-skills.json` if it really is old output |
-| Skill body's relative link 404s | `~/.dsh/companion` or `~/.dsh/docs` junction missing | re-run `install.ps1` |
+| `ask` hangs or 401 | agy needs a localhost port plus its OAuth token | run it unsandboxed and log `agy` in once |
+| Skill body's relative path 404s | `assets/` incomplete after a manual edit | re-run `node scripts/vendor-upstream.mjs` |
+| Everything vanished after reinstall | the row id changed to a package name pnpm cannot resolve | `dsh plugin --profile desktop why dsh-agy-staff` |
 
 ## Credits
 
-**This project is an adapter, not the invention.** All of the design that makes this worth using — the five personas, the companion script, the job protocol, the prompts, and the bench that measures them — belongs to [**keli-wen**](https://github.com/keli-wen) and the [agy-staff](https://github.com/keli-wen/agy-staff) contributors. Go star the upstream repo; if you use this, you are using their work.
+**This is an adapter, not the invention.** The design that makes it worth using — the five personas, the companion, the job protocol, the prompts, and the bench that measures them — belongs to [**keli-wen**](https://github.com/keli-wen) and the [agy-staff](https://github.com/keli-wen/agy-staff) contributors. Go star upstream; if you use this bundle you are using their work.
 
-- Upstream: <https://github.com/keli-wen/agy-staff> (MIT)
+- Upstream: <https://github.com/keli-wen/agy-staff> (MIT, vendored at `9ddec3e`)
 - Bench v1 report: [English](https://lastwhisper.dev/en/zen-of-harness-engineering/agy-staff-bench-v1/) · [中文](https://lastwhisper.dev/zen-of-harness-engineering/agy-staff-bench-v1/)
 - Worker: [Antigravity CLI](https://antigravity.google/product/antigravity-cli)
 
-Thanks also to the DeepSeek Harness authors for a skills system that made a filesystem-level port possible at all.
+Thanks also to the DeepSeek Harness authors: a skill registry that accepts a provider from any bundle is what made a real plugin possible here.
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Upstream agy-staff content stays under its own MIT license and is read from your checkout at install time; nothing from it is vendored here.
+MIT — see [LICENSE](LICENSE) for this bundle's code and [NOTICE](NOTICE) for the vendored upstream material, which stays under its own MIT license (`assets/UPSTREAM-LICENSE`).

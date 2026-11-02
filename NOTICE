@@ -1,0 +1,22 @@
+dsh-agy-staff bundles work from agy-staff.
+
+  agy-staff — https://github.com/keli-wen/agy-staff
+  Copyright (c) keli-wen and contributors
+  MIT License — full text in assets/UPSTREAM-LICENSE
+
+Vendored verbatim from upstream commit 9ddec3e2db2286a53ff7386345f7e699ad9563f0:
+
+  assets/skills/**             the seven persona skills and their references
+  assets/companion/**          the agy companion (Node, standard library only)
+  assets/docs/REFERENCE*.md    reference and design docs
+  assets/templates/**          task brief templates
+
+Nothing in those files is edited on disk. Two adaptations happen at load time in
+index.js, because DeepSeek Harness has no plugin namespace:
+
+  * the frontmatter `name:` is served as `agy-<persona>` (so `/agy` lists all
+    seven), and
+  * `/agy:` in body prose is rendered as `/agy-`.
+
+The provider itself, the package metadata, the bundle patch and the installer
+notes in this repository are original work under the MIT license in LICENSE.
