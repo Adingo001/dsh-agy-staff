@@ -1,8 +1,8 @@
-<p align="center"><img src="assets/logo/dsh-agy-staff.svg" width="520" alt="dsh-agy-staff"></p>
+<p align="center"><img src="assets/logo/dsh-agy-staff.png" width="520" alt="dsh-agy-staff"></p>
 
 <p align="center"><a href="README.md">English</a> | <a href="README.zh-CN.md">简体中文</a></p>
 
-<p align="center"><img src="assets/badges/host-dsh.svg" height="20" alt="host: DeepSeek Harness"> <img src="assets/badges/worker-agy.svg" height="20" alt="worker: agy / Gemini 3.8 Flash"> <img src="assets/badges/license-mit.svg" height="20" alt="license: MIT"> <img src="assets/badges/upstream-agy-staff.svg" height="20" alt="upstream: keli-wen/agy-staff"></p>
+<p align="center"><img src="assets/badges/host-dsh.png" height="20" alt="host: DeepSeek Harness"> <img src="assets/badges/worker-agy.png" height="20" alt="worker: agy / Gemini 3.8 Flash"> <img src="assets/badges/license-mit.png" height="20" alt="license: MIT"> <img src="assets/badges/upstream-agy-staff.png" height="20" alt="upstream: keli-wen/agy-staff"></p>
 
 <p align="center">一个 DeepSeek Harness 插件（bundle），把 <a href="https://github.com/keli-wen/agy-staff">agy-staff</a> 的 personas 装成七个技能：<code>/agy-ask</code>、<code>/agy-staffer</code>、<code>/agy-researcher</code>、<code>/agy-reviewer</code>、<code>/agy-implementer</code>，外加 <code>/agy-lead</code> 和 <code>/agy-jobs</code>。</p>
 
