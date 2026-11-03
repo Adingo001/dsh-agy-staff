@@ -31,6 +31,7 @@ dsh-agy-staff（bundle patch）
 | 技能投递 | 插件清单 | `ctx.skills.registerProvider` |
 | 共享资源 | `<plugin-root>/companion` | `resourceBase` → `<pkg>/assets/` |
 | 生效时机 | 下一次会话 | **重启应用**（bundle 在宿主启动时加载） |
+| 智能体形态 | 无 | `agy` 子智能体 provider + 工具：不用拼 shell 命令也能派活 |
 
 ## 安装
 
@@ -85,7 +86,9 @@ node "$env:USERPROFILE\.dsh\profiles\desktop\node_modules\dsh-agy-staff\assets\c
 
 - **一个 provider，七个 candidate。** `index.js` 解析随包的 `assets/skills/<persona>/SKILL.md` frontmatter，正文即技能内容，`rank: 600`（打包 provider 的优先级）。零依赖，只用 Node 内置模块。
 - **名字前缀是硬需求。** dsh 没有冒号命名空间，只有名字以 `agy` 开头才会被 `/agy` 列出来。所以对外供的是 `agy-<persona>`，磁盘上的目录保留上游的 `ask`/`jobs` —— 这样正文里的 `../jobs/SKILL.md` 原样就能解析。
-- **`resourceBase` 取代 junction。** 每个 candidate 声明 `{ kind: 'directory', path: <pkg>/assets }`，dsh 会告诉模型"相对路径按这个基准目录解析"，于是 `../../companion/agy-companion.mjs`、`../jobs/references/setup.md`、`../../docs/REFERENCE.md` 全部照上游写法可用。
+- **所有路径在喂给模型之前就解析完。** 上游写的是 `<skill-dir>/../../companion/agy-companion.mjs`，把解析留给宿主；在 dsh 里这句话读起来像谜语（"skill dir 是 assets\ask？"），于是每个新会话都要浪费一轮去 glob 找 companion、再浪费一轮纠错。现在 provider 把 `<skill-dir>`、`<plugin-root>`、`../jobs/…`、`../../companion/…`、`../../docs/…` 全部改写成绝对路径，并在正文最前面放一段"已解析，别去找"的说明。命令照抄就能跑，第一次就对，每次都对 —— 磁盘上的 vendored 文件不动。
+- **`resourceBase` 仍然声明。** `{ kind: 'directory', path: <pkg>/assets }` 留作兜底：改写没覆盖到的引用（比如上游明天新加的）照样能解析。
+- **`agy` 同时是子智能体。** `agy-subagent.js` 注册一个进程外的 `SubagentProvider`，bundle 再用 `@deepseek-ai/dsh-tool-subagent` 挂出 `provider: agy, toolName: agy` —— 模型可以把整件事直接派给 Antigravity 当一个子 agent，而不用自己拼 shell 命令、盯 job id。能力位一律声明 `false`（没有 `agentOptions`/`agentPreset`/`outputSchema`/深度限制），因为跨进程的子 agent 兑现不了这些，且不继承父会话上下文。环境变量：`DSH_AGY_SUBAGENT_MODE`（默认 `staffer`）、`DSH_AGY_SUBAGENT_TIMEOUT_MS`、`DSH_AGY_COMPANION`。
 - **文案在加载时本地化。** 上游正文写的是 `/agy:ask`；provider 在 description 和正文里改写成 `/agy-ask`，磁盘上的 vendored 文件保持与上游逐字节一致。
 - **上游是 vendored，而不是安装时才拷。** `assets/` 里是 personas、companion、templates 和参考文档，版本记在 `assets/UPSTREAM-COMMIT`；`NOTICE` 写清了每一块的来源。
 

@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 
-import { ASSETS_PATH, PREFIX, PROVIDER_NAME, provider } from '../index.js';
+import { ASSETS_PATH, COMPANION_PATH, PREFIX, PROVIDER_NAME, provider } from '../index.js';
 
 const EXPECTED = [
     'agy-ask',
@@ -14,6 +14,8 @@ const EXPECTED = [
     'agy-reviewer',
     'agy-staffer',
 ];
+
+const posix = (value) => value.replaceAll('\\', '/').replace(/\/+$/, '');
 
 test('lists every persona under the agy- prefix', async () => {
     const candidates = await provider.list();
@@ -42,19 +44,46 @@ test('bodies arrive without frontmatter', async () => {
     assert.ok(!/^name:/m.test(skill.content));
 });
 
-test('relative references resolve from the resource base', () => {
-    const fromAsk = (relative) => path.join(ASSETS_PATH, 'skills', 'ask', relative);
-    assert.ok(existsSync(fromAsk('../../companion/agy-companion.mjs')), 'companion unreachable');
-    assert.ok(existsSync(fromAsk('../../docs/REFERENCE.md')), 'docs/REFERENCE.md unreachable');
-    assert.ok(existsSync(fromAsk('../jobs/SKILL.md')), 'sibling persona unreachable');
-    assert.ok(existsSync(fromAsk('../jobs/references/setup.md')), 'persona references unreachable');
+test('every host-relative reference is resolved before the model sees it', async () => {
+    const companion = posix(COMPANION_PATH);
+    for (const candidate of await provider.list()) {
+        const { content } = await provider.get(candidate);
+        assert.ok(content.includes(companion), `${candidate.name} does not carry the absolute companion path`);
+        assert.ok(!content.includes('<skill-dir>'), `${candidate.name} still contains <skill-dir>`);
+        assert.ok(!content.includes('<plugin-root>'), `${candidate.name} still contains <plugin-root>`);
+        assert.ok(!content.includes('../../companion/'), `${candidate.name} still contains ../../companion/`);
+        assert.ok(!content.includes('../jobs/'), `${candidate.name} still contains ../jobs/`);
+    }
 });
 
-test('ask body keeps the companion invocation contract', async () => {
-    const skill = await provider.get({ name: 'agy-ask' });
-    assert.match(skill.content, /companion\/agy-companion\.mjs" ask/);
+test('the resolved companion path is quoted and runnable', async () => {
+    const { content } = await provider.get({ name: 'agy-ask' });
+    const line = content.split('\n').find((entry) => entry.includes('agy-companion.mjs"'));
+    assert.ok(line !== undefined, 'no companion command line');
+    assert.ok(line.includes(`node "${posix(COMPANION_PATH)}"`), line);
+});
+
+test('resolved references point at files that exist', async () => {
+    for (const candidate of await provider.list()) {
+        const { content } = await provider.get(candidate);
+        for (const match of content.matchAll(/`([A-Za-z]:\/[^`\s]+\.md)`/g)) {
+            const target = path.win32.normalize(match[1]);
+            assert.ok(existsSync(target), `missing referenced file: ${match[1]}`);
+        }
+    }
+});
+
+test('the resource base still points at the vendored tree', async () => {
+    const [candidate] = await provider.list();
+    const skill = await provider.get(candidate);
+    assert.equal(skill.resourceBase.kind, 'directory');
+    assert.equal(skill.resourceBase.path, ASSETS_PATH);
 });
 
 test('unknown candidates fail loudly', async () => {
     await assert.rejects(() => provider.get({ name: 'agy-nope' }), /unknown skill/);
+});
+
+test('the prefix matches the slash menu contract', () => {
+    assert.equal(PREFIX, 'agy-');
 });

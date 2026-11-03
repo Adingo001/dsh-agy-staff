@@ -31,6 +31,7 @@ Nothing is written into `~/.dsh/skills`, nothing is junctioned, and no upstream 
 | Skill delivery | plugin manifest | `ctx.skills.registerProvider` |
 | Shared resources | `<plugin-root>/companion` | `resourceBase` → `<pkg>/assets/` |
 | Taking effect | next session | **restart the app** (bundles load at host start) |
+| Agent surface | not applicable | `agy` subagent provider + tool: delegate without a shell command |
 
 ## Install
 
@@ -85,7 +86,9 @@ Only `ask` blocks. The rest return a job id; the companion's `wait` collects the
 
 - **One provider, seven candidates.** `index.js` parses the vendored `assets/skills/<persona>/SKILL.md` frontmatter, serves the body as skill content, and reports `rank: 600` (the packaged-provider precedence). It has no dependencies — Node builtins only.
 - **Name prefix is load-bearing.** dsh has no colon namespace; `/agy` only lists something if the *name* starts with `agy`. The bundle therefore serves `agy-<persona>` while the on-disk directory keeps upstream's `ask`/`jobs`, so `../jobs/SKILL.md` still resolves as written.
-- **`resourceBase` replaces junctions.** Every candidate advertises `{ kind: 'directory', path: <pkg>/assets }`; dsh tells the model to resolve relative references against that base, so `../../companion/agy-companion.mjs`, `../jobs/references/setup.md` and `../../docs/REFERENCE.md` work untouched.
+- **Every path is resolved before the model sees it.** Upstream writes `<skill-dir>/../../companion/agy-companion.mjs` and delegates the resolution to its host; under dsh that reads as a riddle, so the first run of every fresh session wasted a turn globbing for the companion and another one retrying. The provider now rewrites `<skill-dir>`, `<plugin-root>`, `../jobs/…`, `../../companion/…` and `../../docs/…` to absolute paths and prepends a "these are resolved, do not search" block. The command runs as written, first try, every time — the vendored bytes stay untouched.
+- **`resourceBase` is still advertised.** `{ kind: 'directory', path: <pkg>/assets }` remains the fallback for anything the rewrite did not catch, so a reference upstream adds tomorrow still resolves.
+- **`agy` is also a subagent.** `agy-subagent.js` registers an out-of-process `SubagentProvider` and the bundle mounts `@deepseek-ai/dsh-tool-subagent` with `provider: agy, toolName: agy`, so the model can hand a whole task to Antigravity as a child agent instead of orchestrating a shell command and a job id. Capabilities are advertised as `false` across the board (no `agentOptions`/`agentPreset`/`outputSchema`/depth limit) because a child in another process cannot honor them, and the child inherits no conversation. Environment knobs: `DSH_AGY_SUBAGENT_MODE` (default `staffer`), `DSH_AGY_SUBAGENT_TIMEOUT_MS`, `DSH_AGY_COMPANION`.
 - **Prose is localized at load.** Upstream bodies say `/agy:ask`; the provider rewrites that to `/agy-ask` in descriptions and bodies, leaving the vendored files byte-identical to upstream.
 - **Upstream is vendored, not copied at install.** `assets/` holds the personas, companion, templates and reference docs at the commit recorded in `assets/UPSTREAM-COMMIT`; `NOTICE` spells out what came from where.
 

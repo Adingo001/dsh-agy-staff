@@ -1,7 +1,19 @@
 # dsh-agy-staff bundle patch.
 #
-# The row owns no host services of its own: it injects `skills` and registers one
-# provider that serves the seven vendored agy personas as /agy-* skills.
+# Row 1 injects `skills` and registers the provider serving the seven vendored
+# agy personas as /agy-* skills; it also registers the `agy` subagent provider.
+# Row 2 builds the delegation tool from that provider, so `agy` is a first-class
+# agent kind next to `subagent` and `subagent_fork` instead of a shell command
+# the model has to assemble and babysit.
 - insert:
     - id: dsh-agy-staff
       name: dsh-agy-staff
+
+    # `maxDepth: provider-managed` is required: a child in another process cannot
+    # enforce a recursion cap, so the harness must not ask it to.
+    - id: dsh-agy-staff-agy-tool
+      name: '@deepseek-ai/dsh-tool-subagent'
+      config:
+        provider: agy
+        toolName: agy
+        maxDepth: provider-managed
