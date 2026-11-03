@@ -46,8 +46,10 @@ function loadBundle(seed) {
         },
         document: {
             head: { appendChild: () => {} },
+            body: { appendChild: () => {} },
             getElementById: () => null,
-            createElement: () => ({ set textContent(v) {}, set id(v) {}, get id() { return ''; } }),
+            querySelector: () => null,
+            createElement: () => ({ style: {}, set textContent(v) {}, set id(v) {}, get id() { return ''; } }),
         },
         fetch: async () => ({ ok: true, status: 200, json: async () => ({ ok: true }) }),
         location: { origin: 'http://127.0.0.1' },

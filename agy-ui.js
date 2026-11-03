@@ -35,6 +35,32 @@ const COMPANION = fileURLToPath(new URL('./assets/companion/agy-companion.mjs', 
 const PACKAGE = fileURLToPath(new URL('./package.json', import.meta.url));
 
 const MAX_BODY_BYTES = 256 * 1024;
+
+/** Last time the browser half said hello: proves the client bundle really ran. */
+let panelHeartbeat;
+
+/**
+ * Read the composed browser module graph. `undefined` when the service is not
+ * present (headless host); otherwise it says whether this package made it into
+ * the boot roster and where its bundle lives.
+ */
+function clientGraph(ctx) {
+    if (ctx === undefined || typeof ctx.get !== 'function') return undefined;
+    const service = ctx.get('clientModules');
+    if (service === undefined) return undefined;
+    try {
+        const graph = service.graph?.();
+        const ids = (graph?.entries ?? []).map((entry) => entry.id).filter((id) => typeof id === 'string');
+        return {
+            rev: graph?.rev,
+            modules: ids.length,
+            ours: ids.includes('dsh-agy-staff'),
+            clientPath: service.clientPath?.('dsh-agy-staff'),
+        };
+    } catch (error) {
+        return { error: String(error?.message ?? error) };
+    }
+}
 const MAX_RESULT_BYTES = 200 * 1024;
 
 /** Run a command to completion, never rejecting. */
@@ -148,11 +174,19 @@ export async function dispatch(request, context = {}) {
                     agy: version,
                     settingsPath: settingsPath(),
                     dshHome: dshHome(),
+                    panel: panelHeartbeat ?? null,
+                    client: clientGraph(context.ctx),
                     defaults: readSettings(),
                     modes: [...MODES],
                     efforts: [...EFFORTS],
                 };
             }
+            case 'panel-alive':
+                panelHeartbeat = {
+                    at: new Date().toISOString(),
+                    version: typeof request.version === 'string' ? request.version : '',
+                };
+                return { ok: true, panel: panelHeartbeat };
             case 'get':
                 return { ok: true, settings: readSettings(), modes: [...MODES], efforts: [...EFFORTS] };
             case 'set': {
@@ -290,7 +324,7 @@ export function apply(ctx) {
             try {
                 const raw = await readBody(req);
                 const request = raw.trim() === '' ? {} : JSON.parse(raw);
-                const body = await dispatch(request, { defaultCwd: process.cwd() });
+                const body = await dispatch(request, { defaultCwd: process.cwd(), ctx });
                 sendJson(res, 200, body);
             } catch (error) {
                 sendJson(res, 200, { ok: false, error: String(error?.message ?? error) });

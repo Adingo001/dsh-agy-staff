@@ -365,12 +365,71 @@ window.__ModuleLoader__.load({
 
 		/* ----------------------------------------------------------------- apply */
 
+		/** Is the panel actually in the document? The one question only the DOM can answer. */
+		function mountedInDocument() {
+			try {
+				return document.querySelector(".dsag-trigger") !== null || document.querySelector(".dsag-panel") !== null;
+			} catch {
+				return false;
+			}
+		}
+
+		/**
+		 * Last resort: own root on `document.body`, independent of the slot host.
+		 * A missing slot, a clipped overlay, or a z-index collision would all leave
+		 * the panel invisible with no error to read, so mount directly instead.
+		 */
+		function mountFallback(reason) {
+			try {
+				if (mountedInDocument()) return false;
+				const createRoot = require("react-dom/client").createRoot;
+				const host = document.createElement("div");
+				host.id = "dsh-agy-staff-root";
+				host.style.position = "fixed";
+				host.style.inset = "0";
+				host.style.pointerEvents = "none";
+				document.body.appendChild(host);
+				createRoot(host).render(h(AgyPanel, null));
+				void api("panel-alive", { version: "client", mount: "fallback", reason: String(reason) }).catch(() => {});
+				return true;
+			} catch (error) {
+				console.warn("[dsh-agy-staff] fallback mount failed:", error);
+				void api("panel-alive", { version: "client", mount: "failed", reason: String(error) }).catch(() => {});
+				return false;
+			}
+		}
+
 		function apply(ctx) {
-			ctx.slots.inject("shell.overlay", () => ctx.slots.register({
-				name: "shell.overlay",
-				id: "dsh-agy-staff-panel",
-				order: 60,
-			}, AgyPanel));
+			// Hello to the host half: proves in `status` that the browser bundle
+			// actually ran, which is otherwise invisible from a shell.
+			void api("panel-alive", { version: "client", mount: "boot" }).catch(() => {});
+
+			const register = () => {
+				try {
+					ctx.slots.register({ name: "shell.overlay", id: "dsh-agy-staff-panel", order: 60 }, AgyPanel);
+				} catch (error) {
+					console.warn("[dsh-agy-staff] panel registration failed:", error);
+				}
+				// The slot host may swallow or clip us; verify against the document.
+				setTimeout(() => {
+					if (mountedInDocument()) {
+						void api("panel-alive", { version: "client", mount: "slot" }).catch(() => {});
+						return;
+					}
+					mountFallback("slot did not render");
+				}, 1200);
+			};
+
+			try {
+				if (ctx.slots !== undefined && typeof ctx.slots.inject === "function") {
+					ctx.slots.inject("shell.overlay", register);
+				} else {
+					register();
+				}
+			} catch (error) {
+				console.warn("[dsh-agy-staff] shell.overlay slot unavailable:", error);
+				register();
+			}
 		}
 
 		exports.name = name;
