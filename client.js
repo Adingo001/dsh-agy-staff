@@ -20,7 +20,23 @@ window.__ModuleLoader__.load({
 		const inject = ["slots"];
 		const API = "/agy/api";
 		const STYLE_ID = "dsag-style";
-		const PANEL_WIDTH = 428;
+		const PANEL_WIDTH = 440;
+
+		/**
+		 * HMR swaps this module without unmounting the previous React tree, so the
+		 * old entry keeps its (now stale) registration and DOM. Counting loads lets
+		 * a swap register under a fresh id and drop the stale hosts, which is what
+		 * makes a layout change visible without restarting the app.
+		 */
+		const GENERATION = (() => {
+			try {
+				const next = (window.__DSAG_GEN__ ?? 0) + 1;
+				window.__DSAG_GEN__ = next;
+				return next;
+			} catch {
+				return 1;
+			}
+		})();
 
 		/* ---------------------------------------------------------------- data */
 
@@ -98,111 +114,221 @@ window.__ModuleLoader__.load({
 
 		/* ---------------------------------------------------------------- style */
 
+		// Module scope, not a React effect: when HMR swaps this bundle the previous
+		// component instance stays mounted, so an effect-owned style node would keep
+		// serving the old CSS forever. Writing it here makes every swap land at once.
+		queueMicrotask(() => {
+			try {
+				ensureStyle();
+			} catch (error) {
+				console.warn("[dsh-agy-staff] style injection failed:", error);
+			}
+		});
+
 		const CSS = `
 .dsag-tab-slot{display:inline-flex;align-items:center;flex:0 0 auto}
 .dsag-tab-btn{appearance:none;position:relative;border:0;background:transparent;cursor:pointer;
-  display:inline-flex;align-items:center;gap:6px;padding:0 0 9px;margin:0 0 0 20px;
+  display:inline-flex;align-items:center;gap:7px;padding:0 2px 9px;margin:0 0 0 20px;
   font:500 13px/16px system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
   color:var(--dsw-alias-label-tertiary,#64748b);white-space:nowrap;-webkit-text-fill-color:currentColor}
 .dsag-tab-btn:hover{color:var(--dsw-alias-label-primary,#0f172a)}
 .dsag-tab-btn.on{color:var(--dsw-alias-brand-primary,#4f46e5)}
 .dsag-tab-btn.on:after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;border-radius:2px;
   background:var(--dsw-alias-brand-primary,#4f46e5)}
-.dsag-fallback{position:fixed;right:16px;bottom:96px;z-index:2147483000}\n.dsag-fallback .dsag-tab-btn{margin:0;padding:7px 12px;min-height:32px;border-radius:16px;\n  background:var(--dsw-alias-brand-primary,#4f46e5);color:var(--dsw-alias-label-primary-inverted,#fff)}\n.dsag-fallback .dsag-tab-btn.on:after{display:none}\n.dsag-dot{width:6px;height:6px;border-radius:3px;background:var(--dsw-alias-label-caption,#94a3b8);flex:0 0 auto}
-.dsag-dot.ok{background:var(--dsw-alias-state-success-primary,#10b981)}
-.dsag-dot.bad{background:var(--dsw-alias-state-error-primary,#f43f5e)}
+.dsag-fallback{position:fixed;right:16px;bottom:96px;z-index:2147483000}
+.dsag-fallback .dsag-tab-btn{margin:0;padding:7px 12px;min-height:32px;border-radius:16px;
+  background:var(--dsw-alias-brand-primary,#4f46e5);color:var(--dsw-alias-label-primary-inverted,#ffffff)}
+.dsag-fallback .dsag-tab-btn.on:after{display:none}
+.dsag-dot{width:6px;height:6px;border-radius:999px;background:var(--dsw-alias-label-caption,#94a3b8);flex:0 0 auto;
+  box-shadow:0 0 0 3px rgba(148,163,184,.12);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-label-caption,#94a3b8) 12%,transparent)}
+.dsag-dot.ok{background:var(--dsw-alias-state-success-primary,#10b981);
+  box-shadow:0 0 0 3px rgba(16,185,129,.12);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-state-success-primary,#10b981) 12%,transparent)}
+.dsag-dot.bad{background:var(--dsw-alias-state-error-primary,#f43f5e);
+  box-shadow:0 0 0 3px rgba(244,63,94,.12);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-state-error-primary,#f43f5e) 12%,transparent)}
 
-.dsag-panel{position:fixed;z-index:2147483000;box-sizing:border-box;width:428px;max-width:calc(100vw - 24px);
-  max-height:min(74vh,640px);overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;border-radius:12px;
+.dsag-panel{position:fixed;z-index:2147483000;box-sizing:border-box;width:440px;max-width:calc(100vw - 24px);
+  max-height:min(76vh,660px);overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;border-radius:14px;
   background:var(--dsw-alias-bg-layer-2,#ffffff);color:var(--dsw-alias-label-primary,#0f172a);
-  border:1px solid var(--dsw-alias-border-l1,rgba(15,23,42,.12));
-  box-shadow:0 18px 44px rgba(15,23,42,.16),0 2px 6px rgba(15,23,42,.06);
-  font:13px/1.55 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
-  -webkit-text-fill-color:currentColor}
-[data-theme="dark"] .dsag-panel{box-shadow:0 18px 44px rgba(0,0,0,.5)}
-.dsag-head{display:flex;align-items:center;gap:8px;padding:12px 16px}
-.dsag-title{font-weight:600;font-size:13px;letter-spacing:.01em;color:var(--dsw-alias-label-primary,#0f172a)}
+  border:1px solid var(--dsw-alias-border-l1,rgba(15,23,42,.1));
+  box-shadow:0 12px 32px rgba(0,0,0,.16);
+  font:12.5px/1.45 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  font-variant-numeric:tabular-nums;-webkit-text-fill-color:currentColor}
+.dsag-head{position:sticky;top:0;z-index:4;box-sizing:border-box;height:44px;padding:0 10px 0 16px;
+  display:flex;align-items:center;gap:8px;background:var(--dsw-alias-bg-layer-2,#ffffff);
+  border-bottom:1px solid var(--dsw-alias-border-l1,rgba(15,23,42,.08))}
+.dsag-title{font-weight:650;font-size:13.5px;letter-spacing:-.01em;color:var(--dsw-alias-label-primary,#0f172a)}
+.dsag-chip{display:inline-flex;align-items:center;height:19px;padding:0 6px;border-radius:5px;
+  font:500 11px/1 ui-monospace,SFMono-Regular,Consolas,monospace;font-variant-numeric:tabular-nums;
+  color:var(--dsw-alias-label-secondary,#475569);background:var(--dsw-alias-bg-layer-1,#f1f5f9);
+  border:1px solid var(--dsw-alias-border-l1,rgba(15,23,42,.08))}
 .dsag-spacer{margin-left:auto}
+.dsag-head-acts{margin-left:auto;display:inline-flex;align-items:center;gap:2px}
 .dsag-x{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-tertiary,#64748b);
-  cursor:pointer;font-size:16px;line-height:1;padding:4px 8px;border-radius:6px}
+  cursor:pointer;width:28px;height:28px;padding:0;border-radius:7px;font-size:16px;line-height:1;
+  display:inline-flex;align-items:center;justify-content:center}
 .dsag-x:hover{background:var(--dsw-alias-interactive-bg-hover,var(--dsw-alias-bg-layer-3,rgba(15,23,42,.06)));
   color:var(--dsw-alias-label-primary,#0f172a)}
-.dsag-sec{padding:12px 16px;border-top:1px solid var(--dsw-alias-border-l1,rgba(15,23,42,.08))}
-.dsag-label{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
-  color:var(--dsw-alias-label-tertiary,#64748b);margin:0 0 8px}
+
+.dsag-body{padding:14px 16px;display:flex;flex-direction:column;gap:14px}
+.dsag-sec{display:flex;flex-direction:column;gap:8px}
+.dsag-sec+.dsag-sec{padding-top:14px;border-top:1px solid var(--dsw-alias-border-l1,rgba(15,23,42,.08))}
+.dsag-sec-head{display:flex;align-items:center;gap:8px;min-height:18px}
+.dsag-label{font-size:11px;font-weight:600;line-height:1.2;letter-spacing:.04em;
+  color:var(--dsw-alias-label-tertiary,#64748b);margin:0}
 .dsag-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.dsag-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.dsag-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px}
+.dsag-col{display:flex;flex-direction:column;gap:10px;min-width:0}
 .dsag-field{display:flex;flex-direction:column;gap:4px;min-width:0}
-.dsag-field>span{font-size:11px;color:var(--dsw-alias-label-tertiary,#64748b)}
+.dsag-field>span{font-size:11px;line-height:1.2;font-weight:500;color:var(--dsw-alias-label-secondary,#475569)}
+
 .dsag-panel input:not([type="checkbox"]),.dsag-panel select{box-sizing:border-box;width:100%;height:28px;
-  padding:0 8px;border-radius:6px;font:inherit;outline:none;
+  padding:0 8px;border-radius:7px;font:12px/1 inherit;font-variant-numeric:tabular-nums;outline:none;
   background:var(--dsw-alias-bg-layer-1,#f8fafc);color:var(--dsw-alias-label-primary,#0f172a);
-  border:1px solid var(--dsw-alias-border-l1,rgba(15,23,42,.14))}
-.dsag-panel textarea{box-sizing:border-box;width:100%;height:auto;min-height:56px;padding:6px 8px;
-  border-radius:6px;font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;outline:none;resize:vertical;
-  background:var(--dsw-alias-markdown-code-block,var(--dsw-alias-bg-layer-1,#f8fafc));
-  color:var(--dsw-alias-label-primary,#0f172a);border:1px solid var(--dsw-alias-border-l1,rgba(15,23,42,.14))}
-.dsag-panel input:focus,.dsag-panel select:focus,.dsag-panel textarea:focus{
+  border:1px solid var(--dsw-alias-border-l2,rgba(15,23,42,.12))}
+.dsag-panel input::placeholder{color:var(--dsw-alias-label-caption,#94a3b8)}
+.dsag-panel textarea{box-sizing:border-box;width:100%;height:auto;min-height:56px;padding:7px 76px 7px 10px;
+  border-radius:7px;font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;outline:none;resize:vertical;
+  background:var(--dsw-alias-bg-layer-1,#f8fafc);color:var(--dsw-alias-label-primary,#0f172a);
+  border:1px solid var(--dsw-alias-border-l2,rgba(15,23,42,.12))}
+.dsag-panel textarea::placeholder{font:11.5px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;
+  color:var(--dsw-alias-label-caption,#94a3b8)}
+.dsag-panel input:not([type="checkbox"]):focus,.dsag-panel select:focus,.dsag-panel textarea:focus{
   border-color:var(--dsw-alias-brand-primary,#4f46e5)}
 .dsag-panel input:focus-visible,.dsag-panel select:focus-visible,.dsag-panel textarea:focus-visible,
-.dsag-btn:focus-visible,.dsag-tab-btn:focus-visible,.dsag-x:focus-visible{
+.dsag-btn:focus-visible,.dsag-seg-btn:focus-visible,.dsag-tab-btn:focus-visible,.dsag-x:focus-visible{
   outline:none;border-color:var(--dsw-alias-brand-primary,#4f46e5);
   box-shadow:0 0 0 3px rgba(79,70,229,.2);
   box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary,#4f46e5) 20%,transparent)}
-.dsag-btn{appearance:none;cursor:pointer;border-radius:6px;padding:0 10px;height:28px;
-  font:500 12px/1 inherit;color:var(--dsw-alias-label-primary,inherit);
+
+.dsag-seg{box-sizing:border-box;display:grid;grid-template-columns:repeat(3,1fr);gap:2px;height:28px;padding:2px;
+  border-radius:7px;background:var(--dsw-alias-bg-layer-1,#f1f5f9);
+  border:1px solid var(--dsw-alias-border-l2,rgba(15,23,42,.12))}
+.dsag-seg-btn{appearance:none;border:0;border-radius:5px;background:transparent;cursor:pointer;padding:0 4px;
+  font:500 11.5px/1 inherit;color:var(--dsw-alias-label-secondary,#475569);
+  display:inline-flex;align-items:center;justify-content:center}
+.dsag-seg-btn:hover{color:var(--dsw-alias-label-primary,#0f172a);
+  background:var(--dsw-alias-interactive-bg-hover,rgba(15,23,42,.05))}
+.dsag-seg-btn.on{background:var(--dsw-alias-button-primary-fill,var(--dsw-alias-brand-primary,#4f46e5));
+  color:var(--dsw-alias-label-primary-inverted,#ffffff);font-weight:600;
+  box-shadow:0 1px 2px rgba(0,0,0,.14)}
+
+.dsag-toggle-bar{display:flex;align-items:center;gap:12px;padding-top:10px;
+  border-top:1px solid var(--dsw-alias-border-l1,rgba(15,23,42,.07))}
+.dsag-toggle{display:inline-flex;align-items:center;gap:6px;cursor:pointer;user-select:none;
+  font-size:11.5px;color:var(--dsw-alias-label-secondary,#475569)}
+.dsag-switch{appearance:none;position:relative;width:26px;height:15px;margin:0;border-radius:999px;cursor:pointer;
+  flex:0 0 auto;background:var(--dsw-alias-bg-layer-3,#cbd5e1);
+  border:1px solid var(--dsw-alias-border-l2,rgba(15,23,42,.14));transition:background .14s ease,border-color .14s ease}
+.dsag-switch:after{content:"";position:absolute;top:1px;left:1px;width:11px;height:11px;border-radius:999px;
+  background:var(--dsw-alias-bg-layer-2,#ffffff);box-shadow:0 1px 2px rgba(0,0,0,.18);transition:transform .14s ease}
+.dsag-switch:checked{background:var(--dsw-alias-button-primary-fill,var(--dsw-alias-brand-primary,#4f46e5));
+  border-color:var(--dsw-alias-button-primary-fill,var(--dsw-alias-brand-primary,#4f46e5))}
+.dsag-switch:checked:after{transform:translateX(11px);background:var(--dsw-alias-label-primary-inverted,#ffffff)}
+.dsag-notice{font-size:11px;color:var(--dsw-alias-state-success-primary,#10b981);
+  min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.dsag-btn{appearance:none;cursor:pointer;box-sizing:border-box;border-radius:7px;padding:0 10px;height:28px;
+  font:500 12px/1 inherit;color:var(--dsw-alias-label-primary,#0f172a);
   background:var(--dsw-alias-bg-layer-1,#f1f5f9);
   border:1px solid var(--dsw-alias-border-l2,rgba(15,23,42,.12));
-  display:inline-flex;align-items:center;justify-content:center}
+  display:inline-flex;align-items:center;justify-content:center;gap:4px;flex:0 0 auto}
 .dsag-btn:hover{background:var(--dsw-alias-interactive-bg-hover,var(--dsw-alias-bg-layer-3,#e2e8f0))}
 .dsag-btn.primary{color:var(--dsw-alias-label-primary-inverted,#ffffff);border-color:transparent;
   background:var(--dsw-alias-button-primary-fill,var(--dsw-alias-brand-primary,#4f46e5))}
-.dsag-btn.primary:hover{filter:brightness(1.08)}
+.dsag-btn.primary:hover{filter:brightness(1.07)}
+.dsag-btn.dsag-btn-ghost{background:transparent;border-color:transparent;
+  color:var(--dsw-alias-label-secondary,#475569)}
+.dsag-btn.dsag-btn-ghost:hover{background:var(--dsw-alias-interactive-bg-hover,var(--dsw-alias-bg-layer-3,rgba(15,23,42,.06)));
+  color:var(--dsw-alias-label-primary,#0f172a)}
+.dsag-btn.dsag-icon-btn{width:28px;padding:0;color:var(--dsw-alias-label-tertiary,#64748b)}
+.dsag-btn.dsag-btn-primary-ghost{height:24px;padding:0 9px;font-size:11.5px;
+  color:var(--dsw-alias-brand-primary,#4f46e5);
+  border-color:rgba(79,70,229,.28);
+  border-color:color-mix(in srgb,var(--dsw-alias-brand-primary,#4f46e5) 30%,transparent);
+  background:rgba(79,70,229,.08);
+  background:color-mix(in srgb,var(--dsw-alias-brand-primary,#4f46e5) 9%,var(--dsw-alias-bg-layer-2,#ffffff))}
+.dsag-btn.dsag-btn-primary-ghost:hover{
+  background:rgba(79,70,229,.15);
+  background:color-mix(in srgb,var(--dsw-alias-brand-primary,#4f46e5) 16%,var(--dsw-alias-bg-layer-2,#ffffff))}
+.dsag-btn.dsag-btn-sm{height:24px;padding:0 7px;font-size:11px;border-radius:6px}
 .dsag-btn.danger{color:var(--dsw-alias-state-error-primary,#e11d48);
   border-color:var(--dsw-alias-border-l1,rgba(225,29,72,.2))}
-.dsag-btn.danger:hover{background:var(--dsw-alias-interactive-bg-hover,var(--dsw-alias-bg-layer-3,rgba(225,29,72,.08)))}
+.dsag-btn.dsag-btn-ghost.danger{border-color:transparent;color:var(--dsw-alias-state-error-primary,#e11d48)}
+.dsag-btn.danger:hover{background:var(--dsw-alias-interactive-bg-hover,var(--dsw-alias-bg-layer-3,rgba(225,29,72,.08)));
+  color:var(--dsw-alias-state-error-primary,#e11d48)}
 .dsag-btn:disabled{opacity:.45;cursor:not-allowed;filter:none}
-.dsag-hint{font-size:11px;color:var(--dsw-alias-label-tertiary,#64748b)}
-.dsag-mono{font:11px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;
+
+.dsag-test-box{position:relative}
+.dsag-test-run{position:absolute;top:6px;right:6px;z-index:1}
+.dsag-meta{font-size:11px;font-variant-numeric:tabular-nums;color:var(--dsw-alias-label-secondary,#475569)}
+.dsag-meta.ok{color:var(--dsw-alias-state-success-primary,#10b981)}
+.dsag-meta.bad{color:var(--dsw-alias-state-error-primary,#e11d48)}
+.dsag-hint{font-size:11px;color:var(--dsw-alias-label-tertiary,#64748b);font-variant-numeric:tabular-nums}
+.dsag-empty{padding:2px 0;margin:0}
+.dsag-mono{font:11px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace;font-variant-numeric:tabular-nums;
   color:var(--dsw-alias-label-secondary,#475569);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.dsag-out{margin-top:8px;border-radius:6px;padding:8px 12px;
+.dsag-out{margin:0;border-radius:7px;padding:8px 11px;
   border:1px solid var(--dsw-alias-border-l1,rgba(15,23,42,.12));
+  border-left:2px solid var(--dsw-alias-brand-primary,#4f46e5);
   background:var(--dsw-alias-markdown-code-block,var(--dsw-alias-bg-layer-1,#f8fafc));
   color:var(--dsw-alias-label-primary,#0f172a);
-  font:11.5px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-wrap;
-  overflow-wrap:anywhere;max-height:190px;overflow:auto}
-.dsag-err{color:var(--dsw-alias-state-error-primary,#e11d48);font-size:12px}
-.dsag-jobs{display:flex;flex-direction:column;gap:6px;max-height:186px;overflow:auto}
-.dsag-job{display:flex;align-items:center;gap:8px}
-.dsag-job .id{flex:1;min-width:0;font:11.5px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace;
-  color:var(--dsw-alias-label-secondary,#475569);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.dsag-job .dsag-btn:first-of-type{margin-left:auto}
-.dsag-badge{font-size:10.5px;line-height:1;padding:3px 7px;border-radius:999px;
-  border:1px solid var(--dsw-alias-border-l1,rgba(15,23,42,.15));
+  font:11.5px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace;font-variant-numeric:tabular-nums;
+  white-space:pre-wrap;overflow-wrap:anywhere;max-height:184px;overflow:auto}
+.dsag-out.dsag-out-err{border-left-color:var(--dsw-alias-state-error-primary,#e11d48)}
+.dsag-err{padding:7px 10px;border-radius:7px;font-size:11.5px;
+  color:var(--dsw-alias-state-error-primary,#e11d48);
+  border:1px solid var(--dsw-alias-border-l1,rgba(225,29,72,.2));
+  border-left:2px solid var(--dsw-alias-state-error-primary,#e11d48);
+  background:var(--dsw-alias-bg-layer-1,#fff1f2)}
+
+.dsag-cwd{width:176px !important;flex:0 1 176px}
+.dsag-jobs{display:flex;flex-direction:column;gap:3px;max-height:188px;overflow:auto}
+.dsag-job{display:flex;align-items:center;gap:8px;min-height:30px;padding:2px 4px 2px 8px;
+  border-radius:7px;border-left:2px solid transparent}
+.dsag-job:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(15,23,42,.04))}
+.dsag-job.dsag-job-running{border-left-color:var(--dsw-alias-link,#0284c7);
+  background:rgba(2,132,199,.04);
+  background:color-mix(in srgb,var(--dsw-alias-link,#0284c7) 5%,transparent)}
+.dsag-job-mode{flex:0 0 auto;font-size:11.5px;color:var(--dsw-alias-label-secondary,#475569)}
+.dsag-job-id{flex:1 1 auto;min-width:0;font:11px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace;
+  font-variant-numeric:tabular-nums;color:var(--dsw-alias-label-tertiary,#64748b);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dsag-job-acts{margin-left:auto;display:inline-flex;align-items:center;gap:2px;flex:0 0 auto}
+.dsag-badge{box-sizing:border-box;width:64px;flex:0 0 64px;height:20px;padding:0 6px;border-radius:999px;
+  display:inline-flex;align-items:center;justify-content:center;
+  font-size:10.5px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums;
+  border:1px solid var(--dsw-alias-border-l1,rgba(15,23,42,.14));
   color:var(--dsw-alias-label-secondary,#475569);
   background:var(--dsw-alias-bg-layer-1,#f8fafc)}
 .dsag-badge.done{color:var(--dsw-alias-state-success-primary,#0f7b52);
-  border-color:rgba(16,185,129,.45);
-  border-color:color-mix(in srgb,var(--dsw-alias-state-success-primary,#10b981) 40%,transparent);
+  border-color:rgba(16,185,129,.4);
+  border-color:color-mix(in srgb,var(--dsw-alias-state-success-primary,#10b981) 38%,transparent);
   background:rgba(16,185,129,.1);
   background:color-mix(in srgb,var(--dsw-alias-state-success-primary,#10b981) 10%,transparent)}
 .dsag-badge.running{color:var(--dsw-alias-link,#0284c7);
   border-color:rgba(2,132,199,.4);
-  border-color:color-mix(in srgb,var(--dsw-alias-link,#0284c7) 40%,transparent);
+  border-color:color-mix(in srgb,var(--dsw-alias-link,#0284c7) 38%,transparent);
   background:rgba(2,132,199,.08);
   background:color-mix(in srgb,var(--dsw-alias-link,#0284c7) 10%,transparent)}
 .dsag-badge.error,.dsag-badge.timeout{color:var(--dsw-alias-state-error-primary,#b91c1c);
   border-color:rgba(225,29,72,.4);
-  border-color:color-mix(in srgb,var(--dsw-alias-state-error-primary,#e11d48) 40%,transparent);
+  border-color:color-mix(in srgb,var(--dsw-alias-state-error-primary,#e11d48) 38%,transparent);
   background:rgba(225,29,72,.08);
   background:color-mix(in srgb,var(--dsw-alias-state-error-primary,#e11d48) 10%,transparent)}
 .dsag-badge.warn,.dsag-badge.queued{color:var(--dsw-alias-state-warn-primary,#b45309);
   border-color:rgba(245,158,11,.4);
-  border-color:color-mix(in srgb,var(--dsw-alias-state-warn-primary,#f59e0b) 40%,transparent);
+  border-color:color-mix(in srgb,var(--dsw-alias-state-warn-primary,#f59e0b) 38%,transparent);
   background:rgba(245,158,11,.08);
   background:color-mix(in srgb,var(--dsw-alias-state-warn-primary,#f59e0b) 10%,transparent)}
-.dsag-foot{padding:12px 16px;border-top:1px solid var(--dsw-alias-border-l1,rgba(15,23,42,.08));
-  font-size:11px;color:var(--dsw-alias-label-caption,var(--dsw-alias-label-tertiary,#94a3b8))}
+.dsag-foot{padding:8px 16px;border-top:1px solid var(--dsw-alias-border-l1,rgba(15,23,42,.08));
+  background:var(--dsw-alias-bg-layer-1,#f8fafc);display:flex;align-items:center;gap:8px;
+  font-size:11px;font-variant-numeric:tabular-nums;
+  color:var(--dsw-alias-label-caption,var(--dsw-alias-label-tertiary,#94a3b8))}
+@keyframes dsag-spin{to{transform:rotate(360deg)}}
+.dsag-spin{animation:dsag-spin .75s linear infinite}
 `;
 
 		function ensureStyle() {
@@ -228,6 +354,24 @@ window.__ModuleLoader__.load({
 
 		function Label(props) {
 			return h("div", { className: "dsag-label" }, props.text);
+		}
+
+		function RefreshIcon(props) {
+			return h("svg", {
+				viewBox: "0 0 16 16",
+				width: 14,
+				height: 14,
+				fill: "none",
+				stroke: "currentColor",
+				strokeWidth: 1.6,
+				strokeLinecap: "round",
+				strokeLinejoin: "round",
+				className: props.spinning ? "dsag-spin" : undefined,
+				"aria-hidden": "true",
+			},
+				h("path", { d: "M13.5 8a5.5 5.5 0 1 1-1.45-3.72" }),
+				h("path", { d: "M13.5 2.5v2.6h-2.6" }),
+			);
 		}
 
 		function AgyPanel(props) {
@@ -291,7 +435,7 @@ window.__ModuleLoader__.load({
 						},
 					});
 					if (!result.ok) throw new Error(result.error || "save failed");
-					setNotice("已保存，下一次委派生效");
+					setNotice("已保存，下次委派生效");
 					const info = await api("status");
 					if (info.ok) setStatus(info);
 				} catch (e) {
@@ -354,128 +498,215 @@ window.__ModuleLoader__.load({
 
 			const healthy = status !== null && status.agy !== undefined && status.agy.ok;
 			const dotClass = status === null ? "dsag-dot" : healthy ? "dsag-dot ok" : "dsag-dot bad";
+			const healthSummary = status === null
+				? "读取中…"
+				: (healthy ? "agy " + status.agy.version : (status.agy && status.agy.error) || "agy 不可用")
+					+ " · companion " + (status.companionExists ? "✓" : "✗");
+			const healthTitle = status === null
+				? healthSummary
+				: healthSummary + "\n" + status.companion + "\n" + status.settingsPath;
+			const efforts = status && status.efforts ? status.efforts : ["low", "medium", "high"];
+			const cliIssue = status !== null && (!healthy || !status.companionExists) ? healthSummary : "";
 
 			return h("div", { className: "dsag-panel", role: "dialog", "aria-label": "agy" },
 				h("div", { className: "dsag-head" },
-					h("div", { className: dotClass }),
+					h("div", { className: dotClass, title: healthTitle }),
 					h("div", { className: "dsag-title" }, "agy"),
-					status !== null && status.pluginVersion !== undefined
-						? h("span", { className: "dsag-hint" }, "v" + status.pluginVersion)
-						: null,
-					h("div", { className: "dsag-spacer" }),
-					h("button", { className: "dsag-x", title: "关闭", onClick: onClose }, "×"),
+					h("span", { className: "dsag-chip", title: healthTitle },
+						status !== null && status.pluginVersion !== undefined ? "v" + status.pluginVersion : "…"),
+					h("div", { className: "dsag-head-acts" },
+						h("button", {
+							type: "button",
+							className: "dsag-btn dsag-btn-ghost dsag-icon-btn",
+							title: "刷新",
+							"aria-label": "刷新",
+							disabled: busy !== "",
+							onClick: () => void load(),
+						}, h(RefreshIcon, { spinning: busy === "load" })),
+						h("button", {
+							type: "button",
+							className: "dsag-x",
+							title: "关闭",
+							"aria-label": "关闭",
+							onClick: onClose,
+						}, "×"),
+					),
 				),
 
-				error !== "" ? h(Section, null, h("div", { className: "dsag-err" }, error)) : null,
+				h("div", { className: "dsag-body" },
+					error !== "" ? h("div", { className: "dsag-err" }, error) : null,
+					error === "" && cliIssue !== "" ? h("div", { className: "dsag-err" }, cliIssue) : null,
 
-				h(Section, null,
-					h("div", { className: "dsag-row" },
-						h("span", { className: "dsag-hint" },
-							status === null
-								? "读取中…"
-								: (healthy ? "agy " + status.agy.version : status.agy.error || "agy 不可用")
-									+ " · companion " + (status.companionExists ? "✓" : "✗")),
-						h("div", { className: "dsag-spacer" }),
-						h("button", { className: "dsag-btn", disabled: busy !== "", onClick: () => void load() }, "刷新"),
+					h(Section, null,
+						h("div", { className: "dsag-sec-head" },
+							h(Label, { text: "委派配置" }),
+							draft !== null && draft.effort === ""
+								? h("span", { className: "dsag-hint" }, "推理：默认")
+								: null,
+						),
+						draft === null
+							? h("div", { className: "dsag-hint dsag-empty" }, "读取配置中…")
+							: h(react.Fragment, null,
+								h("div", { className: "dsag-grid" },
+									h("div", { className: "dsag-col" },
+										h("label", { className: "dsag-field" },
+											h("span", null, "模式"),
+											h("select", {
+												value: draft.mode,
+												onChange: (e) => setDraft(Object.assign({}, draft, { mode: e.target.value })),
+											}, (status && status.modes ? status.modes : ["staffer"]).map((m) =>
+												h("option", { key: m, value: m }, m)))),
+										h("div", { className: "dsag-field" },
+											h("span", null, "推理强度"),
+											h("div", { className: "dsag-seg", role: "group", "aria-label": "推理强度" },
+												efforts.map((level) => {
+													const active = draft.effort === level;
+													return h("button", {
+														key: level,
+														type: "button",
+														className: active ? "dsag-seg-btn on" : "dsag-seg-btn",
+														"aria-pressed": active ? "true" : "false",
+														title: active ? "再次点击恢复默认" : "设为 " + level,
+														onClick: () => setDraft(Object.assign({}, draft, { effort: active ? "" : level })),
+													}, level);
+												}))),
+									),
+									h("div", { className: "dsag-col" },
+										h("label", { className: "dsag-field" },
+											h("span", null, "模型（留空按默认）"),
+											h("input", {
+												value: draft.model,
+												placeholder: "gemini-3.8-flash-medium",
+												onChange: (e) => setDraft(Object.assign({}, draft, { model: e.target.value })),
+											})),
+										h("label", { className: "dsag-field" },
+											h("span", null, "超时（分钟）"),
+											h("input", {
+												type: "number",
+												min: 1,
+												max: 120,
+												value: draft.timeoutMin,
+												onChange: (e) => setDraft(Object.assign({}, draft, { timeoutMin: e.target.value })),
+											})),
+									),
+								),
+								h("div", { className: "dsag-toggle-bar" },
+									h("label", { className: "dsag-toggle" },
+										h("input", {
+											type: "checkbox",
+											className: "dsag-switch",
+											checked: draft.subagentEnabled,
+											onChange: (e) => setDraft(Object.assign({}, draft, { subagentEnabled: e.target.checked })),
+										}),
+										h("span", null, "agy 子智能体")),
+									h("label", { className: "dsag-toggle" },
+										h("input", {
+											type: "checkbox",
+											className: "dsag-switch",
+											checked: draft.skillsEnabled,
+											onChange: (e) => setDraft(Object.assign({}, draft, { skillsEnabled: e.target.checked })),
+										}),
+										h("span", null, "/agy-* 技能")),
+									h("div", { className: "dsag-spacer" }),
+									notice !== "" ? h("span", { className: "dsag-notice", title: notice }, notice) : null,
+									h("button", {
+										type: "button",
+										className: "dsag-btn primary",
+										disabled: busy !== "",
+										onClick: () => void save(),
+									}, busy === "save" ? "保存中…" : "保存"),
+								),
+							),
 					),
-					status !== null
-						? h("div", { className: "dsag-mono", title: status.companion + "\n" + status.settingsPath },
-							status.companion)
-						: null,
-				),
 
-				draft === null ? null : h(Section, null,
-					h(Label, { text: "委派配置" }),
-					h("div", { className: "dsag-grid" },
-						h("label", { className: "dsag-field" }, h("span", null, "模式"),
-							h("select", {
-								value: draft.mode,
-								onChange: (e) => setDraft(Object.assign({}, draft, { mode: e.target.value })),
-							}, (status && status.modes ? status.modes : ["staffer"]).map((m) => h("option", { key: m, value: m }, m)))),
-						h("label", { className: "dsag-field" }, h("span", null, "推理强度"),
-							h("select", {
-								value: draft.effort,
-								onChange: (e) => setDraft(Object.assign({}, draft, { effort: e.target.value })),
-							}, [h("option", { key: "", value: "" }, "默认")].concat(
-								(status && status.efforts ? status.efforts : ["low", "medium", "high"]).map((x) => h("option", { key: x, value: x }, x))))),
-						h("label", { className: "dsag-field" }, h("span", null, "模型（留空按模式默认）"),
-							h("input", {
-								value: draft.model,
-								placeholder: "gemini-3.8-flash-medium",
-								onChange: (e) => setDraft(Object.assign({}, draft, { model: e.target.value })),
-							})),
-						h("label", { className: "dsag-field" }, h("span", null, "超时（分钟）"),
-							h("input", {
-								type: "number", min: 1, max: 120, value: draft.timeoutMin,
-								onChange: (e) => setDraft(Object.assign({}, draft, { timeoutMin: e.target.value })),
-							})),
-					),
-					h("div", { className: "dsag-row", style: { marginTop: 12 } },
-						h("label", { className: "dsag-row", style: { gap: 8, cursor: "pointer" } },
-							h("input", {
-								type: "checkbox", style: { width: 14, height: 14 },
-								checked: draft.subagentEnabled,
-								onChange: (e) => setDraft(Object.assign({}, draft, { subagentEnabled: e.target.checked })),
+					h(Section, null,
+						h("div", { className: "dsag-sec-head" },
+							h(Label, { text: "连通性测试" }),
+							h("div", { className: "dsag-spacer" }),
+							testOut !== null
+								? h("span", { className: testOut.ok ? "dsag-meta ok" : "dsag-meta bad" },
+									(testOut.ok ? "✓ " : "✗ ") + (testOut.ms || 0) + " ms"
+										+ (testOut.exitCode ? " · exit " + testOut.exitCode : ""))
+								: null,
+						),
+						h("div", { className: "dsag-test-box" },
+							h("textarea", {
+								value: prompt,
+								onChange: (e) => setPrompt(e.target.value),
+								placeholder: "reply with: agy works  # ask, 0 tools",
 							}),
-							h("span", { className: "dsag-hint" }, "agy 子智能体")),
-						h("label", { className: "dsag-row", style: { gap: 8, cursor: "pointer" } },
-							h("input", {
-								type: "checkbox", style: { width: 14, height: 14 },
-								checked: draft.skillsEnabled,
-								onChange: (e) => setDraft(Object.assign({}, draft, { skillsEnabled: e.target.checked })),
-							}),
-							h("span", { className: "dsag-hint" }, "/agy-* 技能")),
-						h("div", { className: "dsag-spacer" }),
-						notice !== "" ? h("span", { className: "dsag-hint" }, notice) : null,
-						h("button", { className: "dsag-btn primary", disabled: busy !== "", onClick: () => void save() },
-							busy === "save" ? "保存中…" : "保存"),
-					),
-				),
-
-				h(Section, null,
-					h(Label, { text: "连通性测试" }),
-					h("textarea", {
-						value: prompt,
-						onChange: (e) => setPrompt(e.target.value),
-						placeholder: "问 agy 一句话（一次 ask，零工具，约 3 秒）",
-					}),
-					h("div", { className: "dsag-row", style: { marginTop: 8 } },
-						h("button", { className: "dsag-btn", disabled: busy !== "", onClick: () => void runTest() },
-							busy === "test" ? "运行中…" : "跑一次"),
+							h("button", {
+								type: "button",
+								className: "dsag-btn dsag-btn-primary-ghost dsag-test-run",
+								disabled: busy !== "",
+								onClick: () => void runTest(),
+							}, busy === "test" ? "运行中…" : "跑一次"),
+						),
 						testOut !== null
-							? h("span", { className: "dsag-hint" },
-								(testOut.ok ? "✓ " : "✗ ") + (testOut.ms || 0) + "ms" + (testOut.exitCode ? " · exit " + testOut.exitCode : ""))
+							? h("div", { className: testOut.ok ? "dsag-out" : "dsag-out dsag-out-err" },
+								testOut.output || "(无输出)")
 							: null,
 					),
-					testOut !== null ? h("div", { className: "dsag-out" }, testOut.output || "(无输出)") : null,
-				),
 
-				h(Section, null,
-					h("div", { className: "dsag-row", style: { marginBottom: 8 } },
-						h(Label, { text: "作业" }),
-						h("div", { className: "dsag-spacer" }),
-						h("input", {
-							value: cwd, placeholder: "仓库目录（留空用宿主 cwd）", style: { width: 200 },
-							onChange: (e) => setCwd(e.target.value),
-						}),
-						h("button", { className: "dsag-btn", disabled: busy !== "", onClick: () => void refreshJobs() }, "刷新"),
+					h(Section, null,
+						h("div", { className: "dsag-sec-head" },
+							h(Label, { text: "作业" }),
+							jobs.length > 0 ? h("span", { className: "dsag-hint" }, String(jobs.length)) : null,
+							h("div", { className: "dsag-spacer" }),
+							h("input", {
+								className: "dsag-cwd",
+								value: cwd,
+								placeholder: "仓库目录（默认宿主 cwd）",
+								onChange: (e) => setCwd(e.target.value),
+							}),
+							h("button", {
+								type: "button",
+								className: "dsag-btn dsag-btn-ghost dsag-btn-sm",
+								disabled: busy !== "",
+								onClick: () => void refreshJobs(),
+							}, "刷新"),
+						),
+						jobs.length === 0
+							? h("div", { className: "dsag-hint dsag-empty" }, "暂无作业记录")
+							: h("div", { className: "dsag-jobs" }, jobs.map((job) => {
+								const running = job.status === "running";
+								return h("div", {
+									className: running ? "dsag-job dsag-job-running" : "dsag-job",
+									key: job.id,
+								},
+									h("span", { className: "dsag-badge " + (job.status || "") }, job.status || "?"),
+									h("span", { className: "dsag-job-mode" }, job.mode || "—"),
+									h("span", {
+										className: "dsag-job-id",
+										title: job.id + (job.model ? " · " + job.model : ""),
+									}, job.id),
+									h("div", { className: "dsag-job-acts" },
+										h("button", {
+											type: "button",
+											className: "dsag-btn dsag-btn-ghost dsag-btn-sm",
+											disabled: busy !== "",
+											onClick: () => void showResult(job.id),
+										}, "结果"),
+										running
+											? h("button", {
+												type: "button",
+												className: "dsag-btn dsag-btn-ghost dsag-btn-sm danger",
+												disabled: busy !== "",
+												onClick: () => void cancelJob(job.id),
+											}, "取消")
+											: null,
+									),
+								);
+							})),
+						jobOut !== null ? h("div", { className: "dsag-out" }, jobOut.id + "\n\n" + jobOut.text) : null,
 					),
-					jobs.length === 0
-						? h("div", { className: "dsag-hint" }, "没有作业记录（该目录下 .agy-staff/state.json 为空或不存在）")
-						: h("div", { className: "dsag-jobs" }, jobs.map((job) => h("div", { className: "dsag-job", key: job.id },
-							h("span", { className: "dsag-badge " + job.status }, job.status || "?"),
-							h("span", { className: "id", title: job.id + " · " + job.mode + " · " + job.model },
-								job.mode + " · " + job.id),
-							h("button", { className: "dsag-btn", disabled: busy !== "", onClick: () => void showResult(job.id) }, "结果"),
-							job.status === "running"
-								? h("button", { className: "dsag-btn danger", disabled: busy !== "", onClick: () => void cancelJob(job.id) }, "取消")
-								: null,
-						))),
-					jobOut !== null ? h("div", { className: "dsag-out" }, jobOut.id + "\n\n" + jobOut.text) : null,
 				),
 
-				h("div", { className: "dsag-foot" },
-					"改动即时生效；面板随应用启动加载，bundle 行不会热更。"),
+				h("div", { className: "dsag-foot", title: healthTitle },
+					h("span", { className: "dsag-mono" }, healthSummary),
+					h("div", { className: "dsag-spacer" }),
+					h("span", null, "保存后下次委派生效"),
+				),
 			);
 		}
 
@@ -593,8 +824,16 @@ window.__ModuleLoader__.load({
 			void api("panel-alive", { version: "boot" }).catch(() => {});
 
 			const register = () => {
+				if (GENERATION > 1 && typeof document !== "undefined") {
+					// The previous generation's portal hosts are detached from state; removing
+					// them unmounts its entry instead of leaving two agy entries on the page.
+					for (const stale of document.querySelectorAll(".dsag-tab-slot, .dsag-fallback, #dsag-agy-staff-root")) {
+						stale.remove();
+					}
+				}
+				const id = GENERATION === 1 ? "dsh-agy-staff-panel" : "dsh-agy-staff-panel-" + GENERATION;
 				try {
-					ctx.slots.register({ name: "shell.overlay", id: "dsh-agy-staff-panel", order: 60 }, AgyOverlay);
+					ctx.slots.register({ name: "shell.overlay", id: id, order: 60 }, AgyOverlay);
 				} catch (error) {
 					console.warn("[dsh-agy-staff] panel registration failed:", error);
 				}

@@ -45,11 +45,11 @@ function makeDocument() {
 }
 
 function loadBundle(options = {}) {
-    const { seed = [], exposeReactDom = true, document = makeDocument() } = options;
+    const { seed = [], exposeReactDom = true, document = makeDocument(), sharedWindow } = options;
     let registration;
     const react = makeReact(seed);
     const reactDom = exposeReactDom ? { createPortal: (node) => node } : undefined;
-    const window = {
+    const window = sharedWindow ?? {
         innerWidth: 1440,
         innerHeight: 900,
         addEventListener: () => {},
@@ -60,6 +60,10 @@ function loadBundle(options = {}) {
             },
         },
     };
+    if (sharedWindow !== undefined) {
+        // One window, two module loads: the loader must capture each registration.
+        sharedWindow.__ModuleLoader__ = { load: (definition) => { registration = definition; } };
+    }
     // eslint-disable-next-line no-new-func
     new Function('window', 'document', 'fetch', 'location', 'console', source)(
         window,
@@ -166,4 +170,24 @@ test('themability comes from host tokens, not from the OS preference', () => {
     for (const token of tokens) {
         assert.ok(known.has(token), `unknown host token: ${token}`);
     }
+});
+
+test('a hot-swapped module registers under a fresh id and clears the stale entry', () => {
+    const shared = {
+        innerWidth: 1440,
+        innerHeight: 900,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+    };
+    shared.__ModuleLoader__ = { load: () => {} };
+    const removed = [];
+    const document = makeDocument();
+    document.querySelectorAll = () => [{ remove: () => removed.push('host') }];
+
+    const first = mount(loadBundle({ sharedWindow: shared, document }));
+    assert.equal(first.definition.id, 'dsh-agy-staff-panel');
+
+    const second = mount(loadBundle({ sharedWindow: shared, document }));
+    assert.equal(second.definition.id, 'dsh-agy-staff-panel-2', 'HMR must not fight the previous registration');
+    assert.deepEqual(removed, ['host'], 'the stale portal host is removed instead of stacking a second entry');
 });
