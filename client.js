@@ -173,23 +173,38 @@ window.__ModuleLoader__.load({
   color:var(--dsw-alias-label-primary,#0f172a)}
 
 .dsag-body{padding:14px 16px;display:flex;flex-direction:column;gap:14px}
-.dsag-sec{display:flex;flex-direction:column;gap:8px}
+.dsag-sec{display:flex;flex-direction:column;gap:8px;margin:0;padding:0}
 .dsag-sec+.dsag-sec{padding-top:14px;border-top:1px solid var(--dsw-alias-border-l1,rgba(15,23,42,.08))}
-.dsag-sec-head{display:flex;align-items:center;gap:8px;min-height:18px}
-.dsag-label{font-size:11px;font-weight:600;line-height:1.2;letter-spacing:.04em;
-  color:var(--dsw-alias-label-tertiary,#64748b);margin:0}
+.dsag-sec-head{display:flex;align-items:center;gap:8px;min-height:16px;margin:0;padding:0}
+.dsag-panel .dsag-label{font-size:11px;font-weight:600;line-height:16px;letter-spacing:.04em;text-transform:uppercase;
+  color:var(--dsw-alias-label-tertiary,#64748b);margin:0;padding:0;text-indent:0;text-align:left;
+  white-space:nowrap;flex:0 0 auto}
+.dsag-panel .dsag-sec-meta{margin-left:auto;font-size:11px;line-height:16px;
+  color:var(--dsw-alias-label-tertiary,#64748b);white-space:nowrap;flex:0 0 auto}
 .dsag-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.dsag-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px}
-.dsag-col{display:flex;flex-direction:column;gap:10px;min-width:0}
-.dsag-field{display:flex;flex-direction:column;gap:4px;min-width:0}
-.dsag-field>span{font-size:11px;line-height:1.2;font-weight:500;color:var(--dsw-alias-label-secondary,#475569)}
+.dsag-panel .dsag-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:12px;row-gap:10px;
+  align-items:start}
+.dsag-panel .dsag-field{display:flex;flex-direction:column;gap:4px;min-width:0;margin:0;padding:0;border:0}
+.dsag-panel .dsag-field>span:first-child{display:block;height:16px;line-height:16px;margin:0;padding:0;
+  font-size:11px;font-weight:500;color:var(--dsw-alias-label-secondary,#475569);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-.dsag-panel input:not([type="checkbox"]),.dsag-panel select{box-sizing:border-box;width:100%;height:28px;
-  padding:0 8px;border-radius:7px;font:12px/1 inherit;font-variant-numeric:tabular-nums;outline:none;
+.dsag-panel .dsag-select-wrap{position:relative;display:block;width:100%;height:28px;min-width:0}
+.dsag-panel .dsag-select-wrap:after{content:"";position:absolute;right:10px;top:50%;width:5px;height:5px;
+  border-right:1.5px solid var(--dsw-alias-label-tertiary,#64748b);
+  border-bottom:1.5px solid var(--dsw-alias-label-tertiary,#64748b);
+  transform:translateY(-65%) rotate(45deg);pointer-events:none}
+.dsag-panel input:not([type="checkbox"]),.dsag-panel select{appearance:none;-webkit-appearance:none;
+  box-sizing:border-box;display:block;width:100%;min-width:0;height:28px;min-height:28px;max-height:28px;
+  margin:0;padding:0 8px;border-radius:7px;
+  font:400 12px/26px system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  font-variant-numeric:tabular-nums;outline:none;
   background:var(--dsw-alias-bg-layer-1,#f8fafc);color:var(--dsw-alias-label-primary,#0f172a);
   border:1px solid var(--dsw-alias-border-l2,rgba(15,23,42,.12))}
+.dsag-panel .dsag-select-wrap select{padding-right:26px;cursor:pointer}
 .dsag-panel input::placeholder{color:var(--dsw-alias-label-caption,#94a3b8)}
-.dsag-panel textarea{box-sizing:border-box;width:100%;height:auto;min-height:56px;padding:7px 76px 7px 10px;
+.dsag-panel textarea{appearance:none;-webkit-appearance:none;display:block;box-sizing:border-box;
+  width:100%;height:auto;min-height:60px;margin:0;padding:6px 68px 6px 10px;
   border-radius:7px;font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;outline:none;resize:vertical;
   background:var(--dsw-alias-bg-layer-1,#f8fafc);color:var(--dsw-alias-label-primary,#0f172a);
   border:1px solid var(--dsw-alias-border-l2,rgba(15,23,42,.12))}
@@ -203,71 +218,97 @@ window.__ModuleLoader__.load({
   box-shadow:0 0 0 3px rgba(79,70,229,.2);
   box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary,#4f46e5) 20%,transparent)}
 
-.dsag-seg{box-sizing:border-box;display:grid;grid-template-columns:repeat(3,1fr);gap:2px;height:28px;padding:2px;
-  border-radius:7px;background:var(--dsw-alias-bg-layer-1,#f1f5f9);
+.dsag-panel .dsag-seg{box-sizing:border-box;display:flex;align-items:stretch;width:100%;min-width:0;
+  height:28px;min-height:28px;max-height:28px;padding:0;margin:0;overflow:hidden;
+  border-radius:7px;background:var(--dsw-alias-bg-layer-1,#f8fafc);
   border:1px solid var(--dsw-alias-border-l2,rgba(15,23,42,.12))}
-.dsag-seg-btn{appearance:none;border:0;border-radius:5px;background:transparent;cursor:pointer;padding:0 4px;
-  font:500 11.5px/1 inherit;color:var(--dsw-alias-label-secondary,#475569);
-  display:inline-flex;align-items:center;justify-content:center}
-.dsag-seg-btn:hover{color:var(--dsw-alias-label-primary,#0f172a);
+.dsag-panel .dsag-seg-btn{appearance:none;-webkit-appearance:none;box-sizing:border-box;
+  flex:1 1 0%;width:0;min-width:0;height:100%;margin:0;padding:0 4px;border:0;border-radius:0;
+  background:transparent;cursor:pointer;
+  font:500 11.5px/1 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  color:var(--dsw-alias-label-secondary,#475569);
+  display:inline-flex;align-items:center;justify-content:center;white-space:nowrap}
+.dsag-panel .dsag-seg-btn+.dsag-seg-btn{border-left:1px solid var(--dsw-alias-border-l2,rgba(15,23,42,.12))}
+.dsag-panel .dsag-seg-btn:hover{color:var(--dsw-alias-label-primary,#0f172a);
   background:var(--dsw-alias-interactive-bg-hover,rgba(15,23,42,.05))}
-.dsag-seg-btn.on{background:var(--dsw-alias-button-primary-fill,var(--dsw-alias-brand-primary,#4f46e5));
-  color:var(--dsw-alias-label-primary-inverted,#ffffff);font-weight:600;
-  box-shadow:0 1px 2px rgba(0,0,0,.14)}
+.dsag-panel .dsag-seg-btn.on{background:var(--dsw-alias-button-primary-fill,var(--dsw-alias-brand-primary,#4f46e5));
+  color:var(--dsw-alias-label-primary-inverted,#ffffff);font-weight:600}
 
-.dsag-toggle-bar{display:flex;align-items:center;gap:12px;padding-top:10px;
+.dsag-panel .dsag-toggle-bar{display:flex;align-items:center;gap:14px;min-height:28px;padding-top:10px;margin:0;
   border-top:1px solid var(--dsw-alias-border-l1,rgba(15,23,42,.07))}
-.dsag-toggle{display:inline-flex;align-items:center;gap:6px;cursor:pointer;user-select:none;
-  font-size:11.5px;color:var(--dsw-alias-label-secondary,#475569)}
-.dsag-switch{appearance:none;position:relative;width:26px;height:15px;margin:0;border-radius:999px;cursor:pointer;
-  flex:0 0 auto;background:var(--dsw-alias-bg-layer-3,#cbd5e1);
+.dsag-panel .dsag-toggle{display:inline-flex;align-items:center;gap:6px;height:28px;margin:0;padding:0;
+  cursor:pointer;user-select:none;font-size:12px;line-height:16px;
+  color:var(--dsw-alias-label-secondary,#475569);white-space:nowrap;flex:0 0 auto}
+.dsag-panel .dsag-toggle>span{display:inline-block;line-height:16px;margin:0;padding:0}
+.dsag-panel input[type="checkbox"].dsag-switch{appearance:none;-webkit-appearance:none;box-sizing:border-box;
+  position:relative;display:inline-block;vertical-align:middle;width:28px;height:16px;min-height:16px;max-height:16px;
+  margin:0;padding:0;border-radius:999px;cursor:pointer;flex:0 0 28px;
+  background:var(--dsw-alias-bg-layer-3,#cbd5e1);
   border:1px solid var(--dsw-alias-border-l2,rgba(15,23,42,.14));transition:background .14s ease,border-color .14s ease}
-.dsag-switch:after{content:"";position:absolute;top:1px;left:1px;width:11px;height:11px;border-radius:999px;
-  background:var(--dsw-alias-bg-layer-2,#ffffff);box-shadow:0 1px 2px rgba(0,0,0,.18);transition:transform .14s ease}
-.dsag-switch:checked{background:var(--dsw-alias-button-primary-fill,var(--dsw-alias-brand-primary,#4f46e5));
+.dsag-panel input[type="checkbox"].dsag-switch:after{content:"";position:absolute;top:1px;left:1px;width:12px;height:12px;
+  border-radius:999px;background:var(--dsw-alias-bg-layer-2,#ffffff);box-shadow:0 1px 2px rgba(0,0,0,.18);
+  transition:transform .14s ease}
+.dsag-panel input[type="checkbox"].dsag-switch:checked{
+  background:var(--dsw-alias-button-primary-fill,var(--dsw-alias-brand-primary,#4f46e5));
   border-color:var(--dsw-alias-button-primary-fill,var(--dsw-alias-brand-primary,#4f46e5))}
-.dsag-switch:checked:after{transform:translateX(11px);background:var(--dsw-alias-label-primary-inverted,#ffffff)}
-.dsag-notice{font-size:11px;color:var(--dsw-alias-state-success-primary,#10b981);
+.dsag-panel input[type="checkbox"].dsag-switch:checked:after{transform:translateX(12px);
+  background:var(--dsw-alias-label-primary-inverted,#ffffff)}
+.dsag-notice{font-size:11px;line-height:16px;color:var(--dsw-alias-state-success-primary,#10b981);
   min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
-.dsag-btn{appearance:none;cursor:pointer;box-sizing:border-box;border-radius:7px;padding:0 10px;height:28px;
-  font:500 12px/1 inherit;color:var(--dsw-alias-label-primary,#0f172a);
+.dsag-btn,.dsag-panel button.dsag-btn{appearance:none;-webkit-appearance:none;cursor:pointer;box-sizing:border-box;
+  position:relative;border-radius:7px;margin:0;padding:0 10px;height:28px;min-height:0;
+  font:500 12px/1 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  color:var(--dsw-alias-label-primary,#0f172a);
   background:var(--dsw-alias-bg-layer-1,#f1f5f9);
   border:1px solid var(--dsw-alias-border-l2,rgba(15,23,42,.12));
-  display:inline-flex;align-items:center;justify-content:center;gap:4px;flex:0 0 auto}
-.dsag-btn:hover{background:var(--dsw-alias-interactive-bg-hover,var(--dsw-alias-bg-layer-3,#e2e8f0))}
-.dsag-btn.primary{color:var(--dsw-alias-label-primary-inverted,#ffffff);border-color:transparent;
-  background:var(--dsw-alias-button-primary-fill,var(--dsw-alias-brand-primary,#4f46e5))}
-.dsag-btn.primary:hover{filter:brightness(1.07)}
-.dsag-btn.dsag-btn-ghost{background:transparent;border-color:transparent;
+  display:inline-flex;align-items:center;justify-content:center;gap:4px;flex:0 0 auto;white-space:nowrap}
+.dsag-btn:hover,.dsag-panel button.dsag-btn:hover{
+  background:var(--dsw-alias-interactive-bg-hover,var(--dsw-alias-bg-layer-3,#e2e8f0))}
+.dsag-btn.primary,.dsag-panel button.dsag-btn.primary{color:var(--dsw-alias-label-primary-inverted,#ffffff);
+  border-color:transparent;background:var(--dsw-alias-button-primary-fill,var(--dsw-alias-brand-primary,#4f46e5))}
+.dsag-btn.primary:hover,.dsag-panel button.dsag-btn.primary:hover{filter:brightness(1.07)}
+.dsag-btn.dsag-btn-ghost,.dsag-panel button.dsag-btn.dsag-btn-ghost{background:transparent;border-color:transparent;
   color:var(--dsw-alias-label-secondary,#475569)}
-.dsag-btn.dsag-btn-ghost:hover{background:var(--dsw-alias-interactive-bg-hover,var(--dsw-alias-bg-layer-3,rgba(15,23,42,.06)));
+.dsag-btn.dsag-btn-ghost:hover,.dsag-panel button.dsag-btn.dsag-btn-ghost:hover{
+  background:var(--dsw-alias-interactive-bg-hover,var(--dsw-alias-bg-layer-3,rgba(15,23,42,.06)));
   color:var(--dsw-alias-label-primary,#0f172a)}
-.dsag-btn.dsag-icon-btn{width:28px;padding:0;color:var(--dsw-alias-label-tertiary,#64748b)}
-.dsag-btn.dsag-btn-primary-ghost{height:24px;padding:0 9px;font-size:11.5px;
-  color:var(--dsw-alias-brand-primary,#4f46e5);
+.dsag-btn.dsag-icon-btn,.dsag-panel button.dsag-btn.dsag-icon-btn{width:28px;padding:0;
+  color:var(--dsw-alias-label-tertiary,#64748b)}
+.dsag-btn.dsag-btn-primary-ghost,.dsag-panel button.dsag-btn.dsag-btn-primary-ghost{height:24px;padding:0 9px;
+  font-size:11.5px;color:var(--dsw-alias-brand-primary,#4f46e5);
   border-color:rgba(79,70,229,.28);
   border-color:color-mix(in srgb,var(--dsw-alias-brand-primary,#4f46e5) 30%,transparent);
   background:rgba(79,70,229,.08);
   background:color-mix(in srgb,var(--dsw-alias-brand-primary,#4f46e5) 9%,var(--dsw-alias-bg-layer-2,#ffffff))}
-.dsag-btn.dsag-btn-primary-ghost:hover{
+.dsag-btn.dsag-btn-primary-ghost:hover,.dsag-panel button.dsag-btn.dsag-btn-primary-ghost:hover{
   background:rgba(79,70,229,.15);
   background:color-mix(in srgb,var(--dsw-alias-brand-primary,#4f46e5) 16%,var(--dsw-alias-bg-layer-2,#ffffff))}
-.dsag-btn.dsag-btn-sm{height:24px;padding:0 7px;font-size:11px;border-radius:6px}
-.dsag-btn.danger{color:var(--dsw-alias-state-error-primary,#e11d48);
+.dsag-btn.dsag-btn-sm,.dsag-panel button.dsag-btn.dsag-btn-sm{height:24px;padding:0 7px;font-size:11px;border-radius:6px}
+.dsag-btn.dsag-foot-btn,.dsag-panel button.dsag-btn.dsag-foot-btn{height:24px;padding:0 6px;font-size:12px;
+  line-height:22px;border-radius:6px;color:var(--dsw-alias-label-secondary,#475569)}
+.dsag-btn.dsag-foot-btn.dsag-foot-upgrade,.dsag-panel button.dsag-btn.dsag-foot-btn.dsag-foot-upgrade{
+  color:var(--dsw-alias-brand-primary,#4f46e5);font-weight:600}
+.dsag-btn.danger,.dsag-panel button.dsag-btn.danger{color:var(--dsw-alias-state-error-primary,#e11d48);
   border-color:var(--dsw-alias-border-l1,rgba(225,29,72,.2))}
-.dsag-btn.dsag-btn-ghost.danger{border-color:transparent;color:var(--dsw-alias-state-error-primary,#e11d48)}
-.dsag-btn.danger:hover{background:var(--dsw-alias-interactive-bg-hover,var(--dsw-alias-bg-layer-3,rgba(225,29,72,.08)));
+.dsag-btn.dsag-btn-ghost.danger,.dsag-panel button.dsag-btn.dsag-btn-ghost.danger{border-color:transparent;
   color:var(--dsw-alias-state-error-primary,#e11d48)}
-.dsag-btn:disabled{opacity:.45;cursor:not-allowed;filter:none}
+.dsag-btn.danger:hover,.dsag-panel button.dsag-btn.danger:hover{
+  background:var(--dsw-alias-interactive-bg-hover,var(--dsw-alias-bg-layer-3,rgba(225,29,72,.08)));
+  color:var(--dsw-alias-state-error-primary,#e11d48)}
+.dsag-btn:disabled,.dsag-panel button.dsag-btn:disabled{opacity:.45;cursor:not-allowed;filter:none}
 
-.dsag-test-box{position:relative}
-.dsag-test-run{position:absolute;top:6px;right:6px;z-index:1}
-.dsag-meta{font-size:11px;font-variant-numeric:tabular-nums;color:var(--dsw-alias-label-secondary,#475569)}
+.dsag-panel .dsag-test-box{position:relative;display:block;width:100%;margin:0;padding:0}
+.dsag-panel .dsag-test-box>button.dsag-btn.dsag-test-run{position:absolute;top:6px;right:6px;bottom:auto;left:auto;
+  margin:0;z-index:2}
+.dsag-meta{margin-left:auto;font-size:11px;line-height:16px;font-variant-numeric:tabular-nums;
+  color:var(--dsw-alias-label-secondary,#475569);white-space:nowrap;flex:0 0 auto}
 .dsag-meta.ok{color:var(--dsw-alias-state-success-primary,#10b981)}
 .dsag-meta.bad{color:var(--dsw-alias-state-error-primary,#e11d48)}
-.dsag-hint{font-size:11px;color:var(--dsw-alias-label-tertiary,#64748b);font-variant-numeric:tabular-nums}
-.dsag-empty{padding:2px 0;margin:0}
+.dsag-hint{font-size:11px;line-height:16px;color:var(--dsw-alias-label-tertiary,#64748b);
+  font-variant-numeric:tabular-nums}
+.dsag-panel .dsag-empty{display:block;width:100%;box-sizing:border-box;margin:0;padding:0;
+  text-indent:0;text-align:left}
 .dsag-mono{font:11px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace;font-variant-numeric:tabular-nums;
   color:var(--dsw-alias-label-secondary,#475569);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dsag-out{margin:0;border-radius:7px;padding:8px 11px;
@@ -284,7 +325,9 @@ window.__ModuleLoader__.load({
   border-left:2px solid var(--dsw-alias-state-error-primary,#e11d48);
   background:var(--dsw-alias-bg-layer-1,#fff1f2)}
 
-.dsag-cwd{width:176px !important;flex:0 1 176px}
+.dsag-panel .dsag-jobs-head{display:flex;align-items:center;gap:8px;height:28px;min-height:28px;margin:0;padding:0}
+.dsag-panel .dsag-jobs-head .dsag-label{line-height:28px}
+.dsag-panel input.dsag-cwd{flex:1 1 0%;width:auto;min-width:0;height:28px;margin:0}
 .dsag-jobs{display:flex;flex-direction:column;gap:3px;max-height:188px;overflow:auto}
 .dsag-job{display:flex;align-items:center;gap:8px;min-height:30px;padding:2px 4px 2px 8px;
   border-radius:7px;border-left:2px solid transparent}
@@ -323,9 +366,25 @@ window.__ModuleLoader__.load({
   border-color:color-mix(in srgb,var(--dsw-alias-state-warn-primary,#f59e0b) 38%,transparent);
   background:rgba(245,158,11,.08);
   background:color-mix(in srgb,var(--dsw-alias-state-warn-primary,#f59e0b) 10%,transparent)}
-.dsag-foot{padding:8px 16px;border-top:1px solid var(--dsw-alias-border-l1,rgba(15,23,42,.08));
-  background:var(--dsw-alias-bg-layer-1,#f8fafc);display:flex;align-items:center;gap:8px;
-  font-size:11px;font-variant-numeric:tabular-nums;
+
+.dsag-update-tray{padding:8px 16px;border-top:1px solid var(--dsw-alias-border-l1,rgba(15,23,42,.08));
+  background:var(--dsw-alias-bg-layer-1,#f8fafc);display:flex;flex-direction:column;gap:6px}
+.dsag-update-bar{display:flex;align-items:center;gap:6px;min-height:24px}
+.dsag-update-meta{font-size:11.5px;line-height:16px;font-variant-numeric:tabular-nums;
+  color:var(--dsw-alias-label-tertiary,#64748b);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dsag-update-meta.ok{color:var(--dsw-alias-state-success-primary,#10b981)}
+.dsag-update-meta.brand{color:var(--dsw-alias-brand-primary,#4f46e5);font-weight:500}
+.dsag-update-meta.err{color:var(--dsw-alias-state-error-primary,#e11d48)}
+.dsag-out.dsag-foot-out{max-height:160px}
+
+.dsag-foot{padding:6px 16px;border-top:1px solid var(--dsw-alias-border-l1,rgba(15,23,42,.08));
+  background:var(--dsw-alias-bg-layer-1,#f8fafc);display:flex;align-items:baseline;justify-content:space-between;
+  gap:8px;font-size:11px;font-variant-numeric:tabular-nums;
+  color:var(--dsw-alias-label-caption,var(--dsw-alias-label-tertiary,#94a3b8));white-space:nowrap}
+.dsag-foot-left{display:flex;align-items:baseline;gap:4px;flex:1 1 auto;min-width:0;overflow:hidden;
+  text-overflow:ellipsis}
+.dsag-foot-ver{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dsag-foot-hint{flex:0 0 auto;margin-left:auto;white-space:nowrap;
   color:var(--dsw-alias-label-caption,var(--dsw-alias-label-tertiary,#94a3b8))}
 @keyframes dsag-spin{to{transform:rotate(360deg)}}
 .dsag-spin{animation:dsag-spin .75s linear infinite}
@@ -386,6 +445,9 @@ window.__ModuleLoader__.load({
 			const [jobs, setJobs] = useState([]);
 			const [jobOut, setJobOut] = useState(null);
 			const [cwd, setCwd] = useState("");
+			const [newerAvailable, setNewerAvailable] = useState(false);
+			const [updateInfo, setUpdateInfo] = useState(null);
+			const [updateOpen, setUpdateOpen] = useState(true);
 			const loadedRef = useRef(false);
 
 			const load = useCallback(async () => {
@@ -496,7 +558,95 @@ window.__ModuleLoader__.load({
 				}
 			}, [cwd, refreshJobs]);
 
+			const checkUpdate = useCallback(async () => {
+				setBusy("update-check");
+				try {
+					const res = await api("update-check");
+					if (!res.ok && typeof res.error === "string" && res.error.indexOf("unknown op") !== -1) {
+						setUpdateInfo({ meta: "重启应用后可用", output: "", tone: "" });
+						setUpdateOpen(false);
+					} else if (!res.ok) {
+						setUpdateInfo({ meta: res.error || "检查更新失败", output: res.output || "", tone: "err" });
+						setUpdateOpen(Boolean(res.output));
+					} else if (res.newerAvailable === true) {
+						setNewerAvailable(true);
+						setUpdateInfo({
+							meta: "发现新版本 " + (res.latest || "?") + "（当前 " + (res.installed || "?") + "）",
+							output: res.output || "",
+							tone: "brand",
+						});
+						setUpdateOpen(Boolean(res.output));
+					} else {
+						setNewerAvailable(false);
+						setUpdateInfo({
+							meta: ("已是最新 " + (res.installed || res.latest || "")).trim(),
+							output: res.output || "",
+							tone: "ok",
+						});
+						setUpdateOpen(Boolean(res.output));
+					}
+				} catch (e) {
+					setUpdateInfo({ meta: String((e && e.message) || e), output: "", tone: "err" });
+					setUpdateOpen(false);
+				} finally {
+					setBusy("");
+				}
+			}, []);
+
+			const applyUpdate = useCallback(async () => {
+				setBusy("update-apply");
+				try {
+					const res = await api("update-apply");
+					if (!res.ok && typeof res.error === "string" && res.error.indexOf("unknown op") !== -1) {
+						setUpdateInfo({ meta: "重启应用后可用", output: "", tone: "" });
+						setUpdateOpen(false);
+					} else if (res.ok) {
+						setNewerAvailable(false);
+						setUpdateInfo({ meta: "升级完成，重启 agy 后生效", output: res.output || "", tone: "ok" });
+						setUpdateOpen(Boolean(res.output));
+						const info = await api("status");
+						if (info.ok) setStatus(info);
+					} else {
+						setUpdateInfo({ meta: res.error || "升级失败", output: res.output || "", tone: "err" });
+						setUpdateOpen(Boolean(res.output));
+					}
+				} catch (e) {
+					setUpdateInfo({ meta: String((e && e.message) || e), output: "", tone: "err" });
+					setUpdateOpen(false);
+				} finally {
+					setBusy("");
+				}
+			}, []);
+
+			const digUpdate = useCallback(async () => {
+				setBusy("update-dig");
+				try {
+					const res = await api("update-dig", { cwd: cwd || undefined });
+					if (!res.ok && typeof res.error === "string" && res.error.indexOf("unknown op") !== -1) {
+						setUpdateInfo({ meta: "重启应用后可用", output: "", tone: "" });
+						setUpdateOpen(false);
+					} else if (res.ok) {
+						const out = String(res.output || "");
+						const matched = /job id:\s*([^\s(]+)/i.exec(out);
+						const jobRef = matched !== null ? matched[1] : (out.split(/\r?\n/)[0] || "").trim();
+						setUpdateInfo({ meta: "已派 job：" + (jobRef || "staffer"), output: out, tone: "brand" });
+						setUpdateOpen(Boolean(out));
+						const list = await api("jobs", { cwd: cwd || undefined });
+						if (list.ok) setJobs(list.jobs);
+					} else {
+						setUpdateInfo({ meta: res.error || "派发失败", output: res.output || "", tone: "err" });
+						setUpdateOpen(Boolean(res.output));
+					}
+				} catch (e) {
+					setUpdateInfo({ meta: String((e && e.message) || e), output: "", tone: "err" });
+					setUpdateOpen(false);
+				} finally {
+					setBusy("");
+				}
+			}, [cwd]);
+
 			const healthy = status !== null && status.agy !== undefined && status.agy.ok;
+			const statusOk = status !== null && status.ok === true;
 			const dotClass = status === null ? "dsag-dot" : healthy ? "dsag-dot ok" : "dsag-dot bad";
 			const healthSummary = status === null
 				? "读取中…"
@@ -540,55 +690,52 @@ window.__ModuleLoader__.load({
 					h(Section, null,
 						h("div", { className: "dsag-sec-head" },
 							h(Label, { text: "委派配置" }),
-							draft !== null && draft.effort === ""
-								? h("span", { className: "dsag-hint" }, "推理：默认")
+							draft !== null
+								? h("span", { className: "dsag-sec-meta" }, "推理：" + (draft.effort === "" ? "默认" : draft.effort))
 								: null,
 						),
 						draft === null
 							? h("div", { className: "dsag-hint dsag-empty" }, "读取配置中…")
 							: h(react.Fragment, null,
 								h("div", { className: "dsag-grid" },
-									h("div", { className: "dsag-col" },
-										h("label", { className: "dsag-field" },
-											h("span", null, "模式"),
+									h("label", { className: "dsag-field" },
+										h("span", null, "模式"),
+										h("span", { className: "dsag-select-wrap" },
 											h("select", {
 												value: draft.mode,
 												onChange: (e) => setDraft(Object.assign({}, draft, { mode: e.target.value })),
 											}, (status && status.modes ? status.modes : ["staffer"]).map((m) =>
-												h("option", { key: m, value: m }, m)))),
-										h("div", { className: "dsag-field" },
-											h("span", null, "推理强度"),
-											h("div", { className: "dsag-seg", role: "group", "aria-label": "推理强度" },
-												efforts.map((level) => {
-													const active = draft.effort === level;
-													return h("button", {
-														key: level,
-														type: "button",
-														className: active ? "dsag-seg-btn on" : "dsag-seg-btn",
-														"aria-pressed": active ? "true" : "false",
-														title: active ? "再次点击恢复默认" : "设为 " + level,
-														onClick: () => setDraft(Object.assign({}, draft, { effort: active ? "" : level })),
-													}, level);
-												}))),
-									),
-									h("div", { className: "dsag-col" },
-										h("label", { className: "dsag-field" },
-											h("span", null, "模型（留空按默认）"),
-											h("input", {
-												value: draft.model,
-												placeholder: "gemini-3.8-flash-medium",
-												onChange: (e) => setDraft(Object.assign({}, draft, { model: e.target.value })),
-											})),
-										h("label", { className: "dsag-field" },
-											h("span", null, "超时（分钟）"),
-											h("input", {
-												type: "number",
-												min: 1,
-												max: 120,
-												value: draft.timeoutMin,
-												onChange: (e) => setDraft(Object.assign({}, draft, { timeoutMin: e.target.value })),
-											})),
-									),
+												h("option", { key: m, value: m }, m))))),
+									h("label", { className: "dsag-field" },
+										h("span", null, "模型"),
+										h("input", {
+											value: draft.model,
+											placeholder: "留空按模式默认",
+											onChange: (e) => setDraft(Object.assign({}, draft, { model: e.target.value })),
+										})),
+									h("div", { className: "dsag-field" },
+										h("span", null, "推理强度"),
+										h("div", { className: "dsag-seg", role: "group", "aria-label": "推理强度" },
+											efforts.map((level) => {
+												const active = draft.effort === level;
+												return h("button", {
+													key: level,
+													type: "button",
+													className: active ? "dsag-seg-btn on" : "dsag-seg-btn",
+													"aria-pressed": active ? "true" : "false",
+													title: active ? "再次点击恢复默认" : "设为 " + level,
+													onClick: () => setDraft(Object.assign({}, draft, { effort: active ? "" : level })),
+												}, level);
+											}))),
+									h("label", { className: "dsag-field" },
+										h("span", null, "超时（分钟）"),
+										h("input", {
+											type: "number",
+											min: 1,
+											max: 120,
+											value: draft.timeoutMin,
+											onChange: (e) => setDraft(Object.assign({}, draft, { timeoutMin: e.target.value })),
+										})),
 								),
 								h("div", { className: "dsag-toggle-bar" },
 									h("label", { className: "dsag-toggle" },
@@ -622,7 +769,6 @@ window.__ModuleLoader__.load({
 					h(Section, null,
 						h("div", { className: "dsag-sec-head" },
 							h(Label, { text: "连通性测试" }),
-							h("div", { className: "dsag-spacer" }),
 							testOut !== null
 								? h("span", { className: testOut.ok ? "dsag-meta ok" : "dsag-meta bad" },
 									(testOut.ok ? "✓ " : "✗ ") + (testOut.ms || 0) + " ms"
@@ -649,10 +795,8 @@ window.__ModuleLoader__.load({
 					),
 
 					h(Section, null,
-						h("div", { className: "dsag-sec-head" },
-							h(Label, { text: "作业" }),
-							jobs.length > 0 ? h("span", { className: "dsag-hint" }, String(jobs.length)) : null,
-							h("div", { className: "dsag-spacer" }),
+						h("div", { className: "dsag-jobs-head" },
+							h(Label, { text: jobs.length > 0 ? "作业 · " + jobs.length : "作业" }),
 							h("input", {
 								className: "dsag-cwd",
 								value: cwd,
@@ -661,7 +805,7 @@ window.__ModuleLoader__.load({
 							}),
 							h("button", {
 								type: "button",
-								className: "dsag-btn dsag-btn-ghost dsag-btn-sm",
+								className: "dsag-btn dsag-btn-ghost",
 								disabled: busy !== "",
 								onClick: () => void refreshJobs(),
 							}, "刷新"),
@@ -702,10 +846,71 @@ window.__ModuleLoader__.load({
 					),
 				),
 
-				h("div", { className: "dsag-foot", title: healthTitle },
-					h("span", { className: "dsag-mono" }, healthSummary),
-					h("div", { className: "dsag-spacer" }),
-					h("span", null, "保存后下次委派生效"),
+				updateInfo !== null
+					? h("div", { className: "dsag-update-tray" },
+						h("div", { className: "dsag-update-bar" },
+							h("span", {
+								className: updateInfo.tone !== ""
+									? "dsag-update-meta " + updateInfo.tone
+									: "dsag-update-meta",
+								title: updateInfo.meta,
+							}, updateInfo.meta),
+							h("div", { className: "dsag-spacer" }),
+							updateInfo.output !== ""
+								? h("button", {
+									type: "button",
+									className: "dsag-btn dsag-btn-ghost dsag-foot-btn",
+									"aria-expanded": updateOpen ? "true" : "false",
+									onClick: () => setUpdateOpen((prev) => !prev),
+								}, updateOpen ? "收起" : "详情")
+								: null,
+							h("button", {
+								type: "button",
+								className: "dsag-btn dsag-btn-ghost dsag-foot-btn",
+								title: "关闭",
+								"aria-label": "关闭更新提示",
+								onClick: () => setUpdateInfo(null),
+							}, "×"),
+						),
+						updateOpen && updateInfo.output !== ""
+							? h("div", {
+								className: updateInfo.tone === "err"
+									? "dsag-out dsag-foot-out dsag-out-err"
+									: "dsag-out dsag-foot-out",
+							}, updateInfo.output)
+							: null,
+					)
+					: null,
+
+				h("div", { className: "dsag-foot" },
+					h("div", { className: "dsag-foot-left" },
+						h("span", { className: "dsag-mono dsag-foot-ver", title: healthTitle }, healthSummary),
+						statusOk
+							? h(react.Fragment, null,
+								h("button", {
+									type: "button",
+									className: "dsag-btn dsag-btn-ghost dsag-foot-btn",
+									disabled: busy !== "",
+									onClick: () => void checkUpdate(),
+								}, "检查更新"),
+								newerAvailable === true
+									? h("button", {
+										type: "button",
+										className: "dsag-btn dsag-btn-ghost dsag-foot-btn dsag-foot-upgrade",
+										disabled: busy !== "",
+										onClick: () => void applyUpdate(),
+									}, busy === "update-apply" ? "升级中…" : "升级")
+									: null,
+								h("button", {
+									type: "button",
+									className: "dsag-btn dsag-btn-ghost dsag-foot-btn",
+									disabled: busy !== "",
+									onClick: () => void digUpdate(),
+								}, "让 agy 抓一下"),
+							)
+							: null,
+					),
+					h("span", { className: "dsag-foot-hint" }, "保存后下次委派生效"),
 				),
 			);
 		}

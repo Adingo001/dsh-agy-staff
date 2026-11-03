@@ -105,6 +105,17 @@ function run(file, args, { cwd, timeoutMs = 120_000 } = {}) {
 
 let versionCache;
 
+/** Compare two dotted versions: negative when `a` is older than `b`. */
+function compareVersions(a, b) {
+    const left = String(a).split('.').map((part) => Number(part) || 0);
+    const right = String(b).split('.').map((part) => Number(part) || 0);
+    for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
+        const diff = (left[index] ?? 0) - (right[index] ?? 0);
+        if (diff !== 0) return diff < 0 ? -1 : 1;
+    }
+    return 0;
+}
+
 /** `agy --version`, cached for the process lifetime (it changes on install only). */
 async function agyVersion() {
     if (versionCache !== undefined) return versionCache;
@@ -189,6 +200,50 @@ export async function dispatch(request, context = {}) {
                     reason: typeof request.reason === 'string' ? request.reason : undefined,
                 };
                 return { ok: true, panel: panelHeartbeat };
+            case 'update-check': {
+                // `agy update` has no --check and would apply the update, so read the
+                // changelog instead and compare its newest version with the installed one.
+                const current = await agyVersion();
+                const log = await run('agy', ['changelog'], { timeoutMs: 60_000 });
+                const text = (log.stdout || log.stderr || '').trim();
+                const found = /v?(\d+\.\d+\.\d+)/.exec(text);
+                const latest = found === null ? '' : found[1];
+                const installed = current.ok ? String(current.version).replace(/^[^\d]*/, '') : '';
+                const newerAvailable = compareVersions(installed, latest) < 0;
+                return {
+                    ok: log.code === 0,
+                    installed,
+                    latest,
+                    upToDate: !newerAvailable,
+                    newerAvailable,
+                    output: text.slice(0, 12_000),
+                };
+            }
+            case 'update-apply': {
+                const result = await run('agy', ['update'], { timeoutMs: 300_000 });
+                versionCache = undefined;
+                return {
+                    ok: result.code === 0,
+                    exitCode: result.code,
+                    ms: result.ms,
+                    output: (result.stdout || result.stderr).trim().slice(-8000),
+                };
+            }
+            case 'update-dig': {
+                // "let the model fetch it": dispatch an agy staffer job that reads the
+                // changelog and reports what is new, without touching the installation.
+                const cwdForJob = typeof request.cwd === 'string' && request.cwd !== '' ? request.cwd : defaultCwd;
+                const prompt = [
+                    'Check whether the Google Antigravity CLI installed on this machine has a newer release available.',
+                    'Run `agy --version` and `agy changelog`, then summarise what changed in the newest release in at most 8 bullet points.',
+                    'Do not upgrade, do not modify files, and do not start other agy-staff jobs.',
+                ].join(' ');
+                const result = await run(process.execPath, [COMPANION, 'staffer', '--prompt', prompt], {
+                    cwd: cwdForJob,
+                    timeoutMs: 120_000,
+                });
+                return { ok: result.code === 0, output: (result.stdout || result.stderr).trim().slice(-4000) };
+            }
             case 'get':
                 return { ok: true, settings: readSettings(), modes: [...MODES], efforts: [...EFFORTS] };
             case 'set': {
