@@ -6,6 +6,13 @@ window.__ModuleLoader__.load({
 		Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
 
 		const react = require("react");
+		const reactDom = (() => {
+			try {
+				return require("react-dom");
+			} catch {
+				return undefined;
+			}
+		})();
 		const h = react.createElement;
 		const { useCallback, useEffect, useRef, useState } = react;
 
@@ -13,6 +20,7 @@ window.__ModuleLoader__.load({
 		const inject = ["slots"];
 		const API = "/agy/api";
 		const STYLE_ID = "dsag-style";
+		const PANEL_WIDTH = 452;
 
 		/* ---------------------------------------------------------------- data */
 
@@ -33,65 +41,146 @@ window.__ModuleLoader__.load({
 			return body;
 		}
 
+		/* --------------------------------------------------------------- anchor */
+
+		const ZH_CONVERSATION = String.fromCharCode(0x5bf9, 0x8bdd);
+
+		/**
+		 * The 对话 / 轨迹 / … tab strip. dsh exposes no slot for it, so the entry
+		 * joins the strip the way the host's own tabs live there: an element
+		 * appended to the row, styled from the host's tokens.
+		 */
+		function findTabRow() {
+			if (typeof document === "undefined") return null;
+			return (
+				document.querySelector("[data-conversation-tabs]") ||
+				document.querySelector("[data-conversation-tabrow]") ||
+				document.querySelector("[role='tablist'][aria-label*='" + ZH_CONVERSATION + "'], [role='tablist'][aria-label*='Conversation' i]") ||
+				document.querySelector("[class*='conversation' i][class*='tab' i][class*='row' i]")
+			);
+		}
+
+		function useTabHost() {
+			const [host, setHost] = useState(null);
+			useEffect(() => {
+				if (typeof document === "undefined") return undefined;
+				let dead = false;
+				const ensure = () => {
+					if (dead) return;
+					const row = findTabRow();
+					if (row === null) {
+						setHost((prev) => (prev === null ? prev : null));
+						return;
+					}
+					let el = row.querySelector(":scope > .dsag-tab-slot");
+					if (el === null) {
+						el = document.createElement("span");
+						el.className = "dsag-tab-slot";
+						el.setAttribute("data-testid", "dsh-agy-staff-tab");
+						// Last child: lands after the host's tabs and after dsh-purge's chip,
+						// which inserts itself between the last [role=tab] and the row end.
+						row.appendChild(el);
+					}
+					setHost((prev) => (prev === el ? prev : el));
+				};
+				ensure();
+				const observer = typeof MutationObserver !== "undefined" ? new MutationObserver(ensure) : null;
+				if (observer) observer.observe(document.body, { childList: true, subtree: true });
+				const interval = setInterval(ensure, 1000);
+				return () => {
+					dead = true;
+					if (observer) observer.disconnect();
+					clearInterval(interval);
+				};
+			}, []);
+			return host;
+		}
+
 		/* ---------------------------------------------------------------- style */
 
 		const CSS = `
-.dsag-trigger{position:fixed;right:18px;bottom:132px;z-index:2147483000;pointer-events:auto;display:flex;align-items:center;justify-content:center;gap:6px;
-  min-width:44px;height:40px;padding:0 13px;border-radius:20px;border:1px solid rgba(129,140,248,.55);cursor:pointer;
-  background:linear-gradient(135deg,#4f46e5,#22d3ee);color:#fff;font:700 13px/1 ui-sans-serif,system-ui,"Segoe UI",sans-serif;
-  letter-spacing:.04em;box-shadow:0 8px 22px rgba(15,23,42,.45),0 0 0 3px rgba(79,70,229,.16)}
-.dsag-trigger:hover{filter:brightness(1.08)}
-.dsag-panel{position:fixed;right:18px;bottom:186px;z-index:2147483001;pointer-events:auto;width:432px;max-height:72vh;overflow:auto;
-  border-radius:14px;border:1px solid rgba(99,102,241,.35);background:#0b1220;color:#e2e8f0;
-  font:12px/1.55 ui-sans-serif,system-ui,"Segoe UI",sans-serif;box-shadow:0 18px 48px rgba(2,6,23,.55)}
-.dsag-head{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid rgba(99,102,241,.22)}
-.dsag-title{font-weight:700;font-size:13px;letter-spacing:.02em}
-.dsag-dot{width:8px;height:8px;border-radius:4px;background:#64748b}
-.dsag-dot.ok{background:#10b981}.dsag-dot.bad{background:#f43f5e}
-.dsag-muted{color:#94a3b8}
-.dsag-x{margin-left:auto;cursor:pointer;border:0;background:transparent;color:#94a3b8;font-size:15px;line-height:1}
-.dsag-x:hover{color:#e2e8f0}
-.dsag-sec{padding:11px 14px;border-bottom:1px solid rgba(99,102,241,.14)}
-.dsag-sec:last-child{border-bottom:0}
-.dsag-label{font-size:11px;color:#94a3b8;margin-bottom:6px;letter-spacing:.03em;text-transform:uppercase}
-.dsag-row{display:flex;gap:8px;align-items:center}
-.dsag-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.dsag-field{display:flex;flex-direction:column;gap:4px}
-.dsag-field span{font-size:11px;color:#94a3b8}
-.dsag input,.dsag select,.dsag textarea{width:100%;box-sizing:border-box;border-radius:8px;border:1px solid rgba(148,163,184,.28);
-  background:#0f172a;color:#e2e8f0;padding:6px 8px;font:inherit;outline:none}
-.dsag input:focus,.dsag select:focus,.dsag textarea:focus{border-color:#6366f1}
-.dsag textarea{resize:vertical;min-height:54px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:11px}
-.dsag-btn{cursor:pointer;border:1px solid rgba(99,102,241,.45);background:rgba(79,70,229,.22);color:#c7d2fe;
-  border-radius:8px;padding:5px 10px;font:600 11px/1.4 inherit}
-.dsag-btn:hover{background:rgba(79,70,229,.34)}
-.dsag-btn.ghost{border-color:rgba(148,163,184,.28);background:transparent;color:#cbd5e1}
-.dsag-btn.danger{border-color:rgba(244,63,94,.45);background:rgba(244,63,94,.14);color:#fecdd3}
+.dsag-tab-slot{display:inline-flex;align-items:center;flex:0 0 auto}
+.dsag-tab-btn{appearance:none;position:relative;border:0;background:transparent;cursor:pointer;
+  display:inline-flex;align-items:center;gap:6px;padding:0 0 9px;margin:0 0 0 22px;
+  font:500 13px/16px system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  color:var(--dsw-alias-label-tertiary,currentColor);white-space:nowrap;-webkit-text-fill-color:currentColor}
+.dsag-tab-btn:hover{color:var(--dsw-alias-label-primary,currentColor)}
+.dsag-tab-btn.on{color:var(--dsw-alias-brand-primary,#4f46e5)}
+.dsag-tab-btn.on:after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;border-radius:2px;
+  background:var(--dsw-alias-brand-primary,#4f46e5)}
+.dsag-dot{width:6px;height:6px;border-radius:3px;background:var(--dsw-alias-label-quaternary,#94a3b8);flex:0 0 auto}
+.dsag-dot.ok{background:var(--dsw-alias-status-success,#10b981)}
+.dsag-dot.bad{background:var(--dsw-alias-status-danger,#f43f5e)}
+
+.dsag-panel{position:fixed;z-index:2147483000;box-sizing:border-box;width:452px;max-width:calc(100vw - 24px);
+  max-height:min(74vh,640px);overflow:auto;overscroll-behavior:contain;border-radius:12px;
+  background:var(--dsw-alias-bg-layer-2,#ffffff);color:var(--dsw-alias-label-primary,#0f172a);
+  border:1px solid var(--dsw-alias-line-1,rgba(15,23,42,.12));
+  box-shadow:0 18px 44px rgba(15,23,42,.18),0 2px 6px rgba(15,23,42,.08);
+  font:13px/1.55 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  -webkit-text-fill-color:currentColor}
+@media (prefers-color-scheme: dark){
+  .dsag-panel{background:var(--dsw-alias-bg-layer-2,#111827);color:var(--dsw-alias-label-primary,#e5e7eb);
+    border-color:var(--dsw-alias-line-1,rgba(148,163,184,.22));box-shadow:0 18px 44px rgba(0,0,0,.5)}
+}
+.dsag-head{display:flex;align-items:center;gap:8px;padding:12px 14px 10px}
+.dsag-title{font-weight:600;font-size:13.5px;letter-spacing:.01em}
+.dsag-spacer{margin-left:auto}
+.dsag-x{appearance:none;border:0;background:transparent;color:var(--dsw-alias-label-tertiary,#94a3b8);
+  cursor:pointer;font-size:16px;line-height:1;padding:2px 4px;border-radius:6px}
+.dsag-x:hover{background:var(--dsw-alias-bg-layer-3,rgba(148,163,184,.16));color:inherit}
+.dsag-sec{padding:12px 14px;border-top:1px solid var(--dsw-alias-line-1,rgba(148,163,184,.16))}
+.dsag-label{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--dsw-alias-label-tertiary,#94a3b8);margin:0 0 8px}
+.dsag-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.dsag-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.dsag-field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.dsag-field>span{font-size:11.5px;color:var(--dsw-alias-label-tertiary,#94a3b8)}
+.dsag-panel input,.dsag-panel select,.dsag-panel textarea{box-sizing:border-box;width:100%;height:30px;
+  padding:0 8px;border-radius:7px;font:inherit;outline:none;
+  background:var(--dsw-alias-bg-layer-1,#f8fafc);color:inherit;
+  border:1px solid var(--dsw-alias-line-1,rgba(15,23,42,.14))}
+.dsag-panel textarea{height:auto;min-height:56px;padding:7px 8px;resize:vertical;
+  font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace}
+.dsag-panel input:focus,.dsag-panel select:focus,.dsag-panel textarea:focus{
+  border-color:var(--dsw-alias-brand-primary,#4f46e5);box-shadow:0 0 0 3px rgba(79,70,229,.14)}
+.dsag-btn{appearance:none;cursor:pointer;border-radius:7px;padding:0 11px;height:30px;
+  font:500 12.5px/1 inherit;color:var(--dsw-alias-label-primary,inherit);
+  background:var(--dsw-alias-bg-layer-1,rgba(148,163,184,.12));
+  border:1px solid var(--dsw-alias-line-1,rgba(148,163,184,.28))}
+.dsag-btn:hover{background:var(--dsw-alias-bg-layer-3,rgba(148,163,184,.2))}
+.dsag-btn.primary{color:#fff;border-color:transparent;background:var(--dsw-alias-brand-primary,#4f46e5)}
+.dsag-btn.primary:hover{filter:brightness(1.06)}
+.dsag-btn.danger{color:var(--dsw-alias-status-danger,#e11d48)}
 .dsag-btn:disabled{opacity:.5;cursor:default}
-.dsag-mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:10.5px;color:#94a3b8;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.dsag-out{margin-top:8px;border-radius:8px;background:#0f172a;border:1px solid rgba(148,163,184,.18);padding:8px;
-  font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:11px;white-space:pre-wrap;overflow-wrap:anywhere;max-height:180px;overflow:auto}
-.dsag-err{color:#fda4af}
-.dsag-jobs{display:flex;flex-direction:column;gap:6px;max-height:190px;overflow:auto}
-.dsag-job{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;background:rgba(15,23,42,.75);
-  border:1px solid rgba(148,163,184,.14)}
-.dsag-job .id{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:10.5px;color:#cbd5e1;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
-.dsag-badge{font-size:10px;padding:1px 6px;border-radius:6px;border:1px solid rgba(148,163,184,.3);color:#cbd5e1}
-.dsag-badge.done{border-color:rgba(16,185,129,.45);color:#6ee7b7}
-.dsag-badge.running{border-color:rgba(34,211,238,.45);color:#67e8f9}
-.dsag-badge.error,.dsag-badge.timeout{border-color:rgba(244,63,94,.45);color:#fda4af}
-.dsag-foot{padding:9px 14px;color:#64748b;font-size:10.5px}
-.dsag-link{color:#818cf8;cursor:pointer;text-decoration:underline dotted}
+.dsag-hint{font-size:11.5px;color:var(--dsw-alias-label-tertiary,#94a3b8)}
+.dsag-mono{font:11px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;
+  color:var(--dsw-alias-label-secondary,#64748b);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dsag-out{margin-top:8px;border-radius:8px;padding:8px;
+  border:1px solid var(--dsw-alias-line-1,rgba(148,163,184,.22));
+  background:var(--dsw-alias-bg-layer-1,rgba(148,163,184,.08));
+  font:11.5px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-wrap;
+  overflow-wrap:anywhere;max-height:190px;overflow:auto}
+.dsag-err{color:var(--dsw-alias-status-danger,#e11d48);font-size:12.5px}
+.dsag-jobs{display:flex;flex-direction:column;gap:6px;max-height:186px;overflow:auto}
+.dsag-job{display:flex;align-items:center;gap:8px}
+.dsag-job .id{flex:1;min-width:0;font:11.5px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace;
+  color:var(--dsw-alias-label-secondary,#475569);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dsag-badge{font-size:10.5px;line-height:1;padding:4px 7px;border-radius:999px;
+  border:1px solid var(--dsw-alias-line-1,rgba(148,163,184,.32));color:var(--dsw-alias-label-secondary,#475569)}
+.dsag-badge.done{color:#0f7b52;border-color:rgba(16,185,129,.45);background:rgba(16,185,129,.1)}
+.dsag-badge.running{color:#0e7490;border-color:rgba(34,211,238,.45);background:rgba(34,211,238,.1)}
+.dsag-badge.error,.dsag-badge.timeout{color:#b91c1c;border-color:rgba(244,63,94,.4);background:rgba(244,63,94,.08)}
+.dsag-foot{padding:9px 14px 11px;border-top:1px solid var(--dsw-alias-line-1,rgba(148,163,184,.16));
+  font-size:11px;color:var(--dsw-alias-label-tertiary,#94a3b8)}
 `;
 
 		function ensureStyle() {
 			if (typeof document === "undefined") return;
 			const existing = document.getElementById(STYLE_ID);
 			if (existing !== null) {
-				// HMR reloads this module without a page refresh, so the shipped CSS
-				// must be able to replace what the previous generation injected.
+				// HMR swaps this module without a page reload, so the shipped CSS
+				// has to be able to replace the previous generation's.
 				if (existing.textContent !== CSS) existing.textContent = CSS;
 				return;
 			}
@@ -101,7 +190,7 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 
-		/* ---------------------------------------------------------------- panel */
+		/* ----------------------------------------------------------------- views */
 
 		function Section(props) {
 			return h("div", { className: "dsag-sec" }, props.children);
@@ -111,8 +200,8 @@ window.__ModuleLoader__.load({
 			return h("div", { className: "dsag-label" }, props.text);
 		}
 
-		function AgyPanel() {
-			const [open, setOpen] = useState(false);
+		function AgyPanel(props) {
+			const onClose = props.onClose;
 			const [status, setStatus] = useState(null);
 			const [draft, setDraft] = useState(null);
 			const [busy, setBusy] = useState("");
@@ -150,14 +239,10 @@ window.__ModuleLoader__.load({
 			}, [cwd]);
 
 			useEffect(() => {
-				ensureStyle();
-			}, []);
-
-			useEffect(() => {
-				if (!open || loadedRef.current) return;
+				if (loadedRef.current) return;
 				loadedRef.current = true;
 				void load();
-			}, [open, load]);
+			}, [load]);
 
 			const save = useCallback(async () => {
 				if (draft === null) return;
@@ -191,8 +276,7 @@ window.__ModuleLoader__.load({
 				setError("");
 				setTestOut(null);
 				try {
-					const result = await api("test", { prompt: prompt, mode: "ask", cwd: cwd || undefined });
-					setTestOut(result);
+					setTestOut(await api("test", { prompt: prompt, mode: "ask", cwd: cwd || undefined }));
 				} catch (e) {
 					setError(String((e && e.message) || e));
 				} finally {
@@ -238,40 +322,40 @@ window.__ModuleLoader__.load({
 				}
 			}, [cwd, refreshJobs]);
 
-			const dot = status === null ? "dsag-dot" : (status.agy && status.agy.ok ? "dsag-dot ok" : "dsag-dot bad");
+			const healthy = status !== null && status.agy !== undefined && status.agy.ok;
+			const dotClass = status === null ? "dsag-dot" : healthy ? "dsag-dot ok" : "dsag-dot bad";
 
-			if (!open) {
-				return h("div", {
-					className: "dsag-trigger",
-					role: "button",
-					title: "agy 控制台",
-					onClick: () => setOpen(true),
-				}, "agy");
-			}
-
-			return h("div", { className: "dsag-panel" },
+			return h("div", { className: "dsag-panel", role: "dialog", "aria-label": "agy" },
 				h("div", { className: "dsag-head" },
-					h("div", { className: dot }),
-					h("div", { className: "dsag-title" }, "agy 控制台"),
-					h("div", { className: "dsag-muted" }, status && status.pluginVersion ? "v" + status.pluginVersion : ""),
-					h("button", { className: "dsag-x", title: "收起", onClick: () => setOpen(false) }, "×"),
+					h("div", { className: dotClass }),
+					h("div", { className: "dsag-title" }, "agy"),
+					status !== null && status.pluginVersion !== undefined
+						? h("span", { className: "dsag-hint" }, "v" + status.pluginVersion)
+						: null,
+					h("div", { className: "dsag-spacer" }),
+					h("button", { className: "dsag-x", title: "关闭", onClick: onClose }, "×"),
 				),
 
 				error !== "" ? h(Section, null, h("div", { className: "dsag-err" }, error)) : null,
 
 				h(Section, null,
-					h(Label, { text: "环境" }),
-					h("div", { className: "dsag-row", style: { justifyContent: "space-between" } },
-						h("div", { className: "dsag-mono", title: status ? status.companion : "" },
-							status === null ? "读取中…" : (status.companionExists ? "companion ✓" : "companion ✗") + " · " + (status.companion || "")),
-						h("button", { className: "dsag-btn ghost", disabled: busy !== "", onClick: () => void load() }, "刷新"),
+					h("div", { className: "dsag-row" },
+						h("span", { className: "dsag-hint" },
+							status === null
+								? "读取中…"
+								: (healthy ? "agy " + status.agy.version : status.agy.error || "agy 不可用")
+									+ " · companion " + (status.companionExists ? "✓" : "✗")),
+						h("div", { className: "dsag-spacer" }),
+						h("button", { className: "dsag-btn", disabled: busy !== "", onClick: () => void load() }, "刷新"),
 					),
-					h("div", { className: "dsag-mono", title: status && status.settingsPath ? status.settingsPath : "" },
-						"agy " + (status && status.agy ? (status.agy.ok ? status.agy.version : status.agy.error) : "…")),
+					status !== null
+						? h("div", { className: "dsag-mono", title: status.companion + "\n" + status.settingsPath },
+							status.companion)
+						: null,
 				),
 
 				draft === null ? null : h(Section, null,
-					h(Label, { text: "委派配置（保存后即时生效）" }),
+					h(Label, { text: "委派配置" }),
 					h("div", { className: "dsag-grid" },
 						h("label", { className: "dsag-field" }, h("span", null, "模式"),
 							h("select", {
@@ -282,7 +366,7 @@ window.__ModuleLoader__.load({
 							h("select", {
 								value: draft.effort,
 								onChange: (e) => setDraft(Object.assign({}, draft, { effort: e.target.value })),
-							}, [h("option", { key: "", value: "" }, "（默认）")].concat(
+							}, [h("option", { key: "", value: "" }, "默认")].concat(
 								(status && status.efforts ? status.efforts : ["low", "medium", "high"]).map((x) => h("option", { key: x, value: x }, x))))),
 						h("label", { className: "dsag-field" }, h("span", null, "模型（留空按模式默认）"),
 							h("input", {
@@ -292,70 +376,67 @@ window.__ModuleLoader__.load({
 							})),
 						h("label", { className: "dsag-field" }, h("span", null, "超时（分钟）"),
 							h("input", {
-								type: "number",
-								min: 1,
-								max: 120,
-								value: draft.timeoutMin,
+								type: "number", min: 1, max: 120, value: draft.timeoutMin,
 								onChange: (e) => setDraft(Object.assign({}, draft, { timeoutMin: e.target.value })),
 							})),
 					),
-					h("div", { className: "dsag-row", style: { marginTop: 8, flexWrap: "wrap" } },
+					h("div", { className: "dsag-row", style: { marginTop: 10 } },
 						h("label", { className: "dsag-row", style: { gap: 6, cursor: "pointer" } },
 							h("input", {
-								type: "checkbox",
-								style: { width: 14 },
+								type: "checkbox", style: { width: 14, height: 14 },
 								checked: draft.subagentEnabled,
 								onChange: (e) => setDraft(Object.assign({}, draft, { subagentEnabled: e.target.checked })),
 							}),
-							h("span", { className: "dsag-muted" }, "agy 子智能体")),
+							h("span", { className: "dsag-hint" }, "agy 子智能体")),
 						h("label", { className: "dsag-row", style: { gap: 6, cursor: "pointer" } },
 							h("input", {
-								type: "checkbox",
-								style: { width: 14 },
+								type: "checkbox", style: { width: 14, height: 14 },
 								checked: draft.skillsEnabled,
 								onChange: (e) => setDraft(Object.assign({}, draft, { skillsEnabled: e.target.checked })),
 							}),
-							h("span", { className: "dsag-muted" }, "/agy-* 技能")),
-						h("button", { className: "dsag-btn", disabled: busy !== "", onClick: () => void save() },
+							h("span", { className: "dsag-hint" }, "/agy-* 技能")),
+						h("div", { className: "dsag-spacer" }),
+						notice !== "" ? h("span", { className: "dsag-hint" }, notice) : null,
+						h("button", { className: "dsag-btn primary", disabled: busy !== "", onClick: () => void save() },
 							busy === "save" ? "保存中…" : "保存"),
-						notice !== "" ? h("span", { className: "dsag-muted" }, notice) : null,
 					),
 				),
 
 				h(Section, null,
-					h(Label, { text: "连通性测试（一次 ask，零工具，约 3 秒）" }),
+					h(Label, { text: "连通性测试" }),
 					h("textarea", {
 						value: prompt,
 						onChange: (e) => setPrompt(e.target.value),
-						placeholder: "问 agy 一句话",
+						placeholder: "问 agy 一句话（一次 ask，零工具，约 3 秒）",
 					}),
 					h("div", { className: "dsag-row", style: { marginTop: 8 } },
 						h("button", { className: "dsag-btn", disabled: busy !== "", onClick: () => void runTest() },
 							busy === "test" ? "运行中…" : "跑一次"),
-						testOut !== null ? h("span", { className: "dsag-muted" },
-							(testOut.ok ? "✓ " : "✗ ") + (testOut.ms || 0) + "ms" + (testOut.exitCode ? " · exit " + testOut.exitCode : "")) : null,
+						testOut !== null
+							? h("span", { className: "dsag-hint" },
+								(testOut.ok ? "✓ " : "✗ ") + (testOut.ms || 0) + "ms" + (testOut.exitCode ? " · exit " + testOut.exitCode : ""))
+							: null,
 					),
 					testOut !== null ? h("div", { className: "dsag-out" }, testOut.output || "(无输出)") : null,
 				),
 
 				h(Section, null,
-					h("div", { className: "dsag-row", style: { justifyContent: "space-between", marginBottom: 6 } },
-						h(Label, { text: "作业" }),
-						h("button", { className: "dsag-btn ghost", disabled: busy !== "", onClick: () => void refreshJobs() }, "刷新"),
-					),
 					h("div", { className: "dsag-row", style: { marginBottom: 8 } },
+						h(Label, { text: "作业" }),
+						h("div", { className: "dsag-spacer" }),
 						h("input", {
-							value: cwd,
-							placeholder: "仓库目录（留空用宿主 cwd）",
+							value: cwd, placeholder: "仓库目录（留空用宿主 cwd）", style: { width: 200 },
 							onChange: (e) => setCwd(e.target.value),
 						}),
+						h("button", { className: "dsag-btn", disabled: busy !== "", onClick: () => void refreshJobs() }, "刷新"),
 					),
 					jobs.length === 0
-						? h("div", { className: "dsag-muted" }, "没有作业记录（该目录下 .agy-staff/state.json 为空或不存在）")
+						? h("div", { className: "dsag-hint" }, "没有作业记录（该目录下 .agy-staff/state.json 为空或不存在）")
 						: h("div", { className: "dsag-jobs" }, jobs.map((job) => h("div", { className: "dsag-job", key: job.id },
 							h("span", { className: "dsag-badge " + job.status }, job.status || "?"),
-							h("span", { className: "id", title: job.id + " · " + job.mode + " · " + job.model }, job.mode + " · " + job.id),
-							h("button", { className: "dsag-btn ghost", disabled: busy !== "", onClick: () => void showResult(job.id) }, "结果"),
+							h("span", { className: "id", title: job.id + " · " + job.mode + " · " + job.model },
+								job.mode + " · " + job.id),
+							h("button", { className: "dsag-btn", disabled: busy !== "", onClick: () => void showResult(job.id) }, "结果"),
 							job.status === "running"
 								? h("button", { className: "dsag-btn danger", disabled: busy !== "", onClick: () => void cancelJob(job.id) }, "取消")
 								: null,
@@ -364,30 +445,109 @@ window.__ModuleLoader__.load({
 				),
 
 				h("div", { className: "dsag-foot" },
-					"改动即时生效；面板本身随应用启动加载，bundle 行不会热更。",
-				),
+					"改动即时生效；面板随应用启动加载，bundle 行不会热更。"),
 			);
 		}
 
-		/* ----------------------------------------------------------------- apply */
+		/* ------------------------------------------------------------------ entry */
+
+		/** The strip entry: a text button, health dot, underline while open. */
+		function AgyTab(props) {
+			const dotClass = props.healthy === undefined ? "dsag-dot" : props.healthy ? "dsag-dot ok" : "dsag-dot bad";
+			return h("button", {
+				type: "button",
+				className: props.open ? "dsag-tab-btn on" : "dsag-tab-btn",
+				"data-testid": "dsh-agy-staff-tab-btn",
+				"aria-expanded": props.open ? "true" : "false",
+				onClick: props.onToggle,
+			}, h("span", { className: dotClass }), "agy");
+		}
+
+		function AgyOverlay() {
+			const host = useTabHost();
+			const [open, setOpen] = useState(false);
+			const [healthy, setHealthy] = useState(undefined);
+			const [anchor, setAnchor] = useState(null);
+			const chipRef = useRef(null);
+
+			useEffect(() => {
+				let alive = true;
+				api("status")
+					.then((info) => {
+						if (alive && info.ok) setHealthy(info.agy !== undefined && info.agy.ok);
+					})
+					.catch(() => {});
+				return () => {
+					alive = false;
+				};
+			}, []);
+
+			const close = useCallback(() => setOpen(false), []);
+
+			const toggle = useCallback(() => {
+				setOpen((prev) => {
+					const next = !prev;
+					if (next) {
+						const rect = chipRef.current === null || chipRef.current === undefined
+							? undefined
+							: chipRef.current.getBoundingClientRect();
+						const left = rect === undefined
+							? 24
+							: Math.max(12, Math.min(rect.left, window.innerWidth - PANEL_WIDTH - 12));
+						const top = rect === undefined ? 64 : rect.bottom + 8;
+						setAnchor({ left: left, top: top });
+					}
+					return next;
+				});
+			}, []);
+
+			useEffect(() => {
+				if (!open) return undefined;
+				const onKey = (event) => {
+					if (event.key === "Escape") setOpen(false);
+				};
+				window.addEventListener("keydown", onKey);
+				return () => window.removeEventListener("keydown", onKey);
+			}, [open]);
+
+			const portal = reactDom !== undefined && typeof reactDom.createPortal === "function"
+				? reactDom.createPortal
+				: null;
+			if (portal === null || typeof document === "undefined") return null;
+
+			const tab = h("span", { ref: chipRef },
+				h(AgyTab, { open: open, healthy: healthy, onToggle: toggle }));
+
+			const target = host !== null ? host : document.body;
+			const panelStyle = anchor === null
+				? { position: "fixed", left: 24, top: 64 }
+				: { position: "fixed", left: anchor.left + "px", top: anchor.top + "px" };
+
+			return h(react.Fragment, null,
+				portal(tab, target),
+				open
+					? portal(h("div", { style: panelStyle }, h(AgyPanel, { onClose: close })), document.body)
+					: null,
+			);
+		}
 
 		/**
-		 * Where the panel ended up, as the DOM sees it. The host records this in
-		 * `status.panel`, so "the button is missing" becomes a measurable fact
-		 * instead of a screenshot argument.
+		 * Where the panel landed, as the DOM sees it. The host records this in
+		 * `status.panel`, so "I don't see it" stays measurable.
 		 */
 		function panelGeometry() {
 			try {
-				const node = document.querySelector(".dsag-trigger") || document.querySelector(".dsag-panel");
-				if (node === null) return undefined;
+				const node = document.querySelector(".dsag-panel") ||
+					document.querySelector(".dsag-tab-btn") ||
+					document.querySelector(".dsag-tab-slot");
+				if (node === null || node === undefined) return undefined;
 				const rect = node.getBoundingClientRect();
 				const visible = rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.right > 0
 					&& rect.top < window.innerHeight && rect.left < window.innerWidth;
-				// A visible rect can still be covered: ask the document who owns that point.
 				let topmost = false;
 				try {
 					const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
-					topmost = hit !== null && (hit === node || node.contains(hit));
+					topmost = hit !== null && hit !== undefined && (hit === node || node.contains(hit));
 				} catch {}
 				return `x${Math.round(rect.left)},y${Math.round(rect.top)},w${Math.round(rect.width)},h${Math.round(rect.height)},visible:${visible},topmost:${topmost}`;
 			} catch (error) {
@@ -395,51 +555,22 @@ window.__ModuleLoader__.load({
 			}
 		}
 
-		/**
-		 * Last resort: own root on `document.body`, independent of the slot host.
-		 * A missing slot, a clipped overlay, or a z-index collision would all leave
-		 * the panel invisible with no error to read, so mount directly instead.
-		 */
-		function mountFallback(reason) {
-			try {
-				if (panelGeometry() !== undefined) return false;
-				const createRoot = require("react-dom/client").createRoot;
-				const host = document.createElement("div");
-				host.id = "dsh-agy-staff-root";
-				host.style.position = "fixed";
-				host.style.inset = "0";
-				host.style.pointerEvents = "none";
-				document.body.appendChild(host);
-				createRoot(host).render(h(AgyPanel, null));
-				void api("panel-alive", { version: "fallback:" + String(reason) + ":" + (panelGeometry() || "no-node") }).catch(() => {});
-				return true;
-			} catch (error) {
-				console.warn("[dsh-agy-staff] fallback mount failed:", error);
-				void api("panel-alive", { version: "failed:" + String(error) }).catch(() => {});
-				return false;
-			}
-		}
-
 		function apply(ctx) {
-			// Hello to the host half: proves in `status` that the browser bundle
-			// actually ran, which is otherwise invisible from a shell.
+			// Hello to the host half: proves in `status` that this bundle ran at all.
 			void api("panel-alive", { version: "boot" }).catch(() => {});
 
 			const register = () => {
 				try {
-					ctx.slots.register({ name: "shell.overlay", id: "dsh-agy-staff-panel", order: 60 }, AgyPanel);
+					ctx.slots.register({ name: "shell.overlay", id: "dsh-agy-staff-panel", order: 60 }, AgyOverlay);
 				} catch (error) {
 					console.warn("[dsh-agy-staff] panel registration failed:", error);
 				}
-				// The slot host may swallow or clip us; verify against the document.
 				setTimeout(() => {
 					const geometry = panelGeometry();
-					if (geometry !== undefined) {
-						void api("panel-alive", { version: "slot:" + geometry }).catch(() => {});
-						return;
-					}
-					mountFallback("slot did not render");
-				}, 1200);
+					void api("panel-alive", {
+						version: geometry === undefined ? "missing" : "mounted:" + geometry,
+					}).catch(() => {});
+				}, 1500);
 			};
 
 			try {

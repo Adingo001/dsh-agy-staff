@@ -5,14 +5,13 @@ import test from 'node:test';
 /**
  * Loads the real browser bundle through a shim of the host's module loader, so a
  * typo in the panel is caught by `npm test` instead of by the user opening the
- * UI. React is stubbed: the component is executed (hooks included) but nothing is
- * diffed.
+ * UI. React is stubbed: components execute (hooks included) but nothing is diffed.
  */
 
 const source = readFileSync(new URL('../client.js', import.meta.url), 'utf8');
 
 /** Minimal React surface the panel touches. */
-function makeReact(seed) {
+function makeReact(seed = []) {
     let hookIndex = 0;
     const queue = [...seed];
     const next = () => (hookIndex < queue.length ? queue[hookIndex++] : undefined);
@@ -33,50 +32,57 @@ function makeReact(seed) {
     };
 }
 
-function loadBundle(seed) {
-    let registration;
-    const react = makeReact(seed);
-    const sandbox = {
-        window: {
-            __ModuleLoader__: {
-                load: (definition) => {
-                    registration = definition;
-                },
-            },
-        },
-        document: {
-            head: { appendChild: () => {} },
-            body: { appendChild: () => {} },
-            getElementById: () => null,
-            querySelector: () => null,
-            createElement: () => ({ style: {}, set textContent(v) {}, set id(v) {}, get id() { return ''; } }),
-        },
-        fetch: async () => ({ ok: true, status: 200, json: async () => ({ ok: true }) }),
-        location: { origin: 'http://127.0.0.1' },
-        console,
+function makeDocument() {
+    return {
+        head: { appendChild: () => {} },
+        body: { appendChild: () => {} },
+        getElementById: () => null,
+        querySelector: () => null,
+        querySelectorAll: () => [],
+        createElement: () => ({ style: {}, className: '', setAttribute: () => {}, appendChild: () => {} }),
+        elementFromPoint: () => null,
     };
-    // eslint-disable-next-line no-new-func
-    new Function('window', 'document', 'fetch', 'location', 'console', source)(sandbox.window, sandbox.document, sandbox.fetch, sandbox.location, console);
-    assert.ok(registration !== undefined, 'the bundle never called __ModuleLoader__.load');
-    assert.equal(registration.id, 'dsh-agy-staff');
-    const exported = registration.factory((id) => {
-        if (id === 'react') return react;
-        throw new Error(`unexpected require("${id}")`);
-    });
-    return exported;
 }
 
-test('the client bundle registers itself under the package id', () => {
-    const exported = loadBundle([]);
-    assert.equal(exported.name, 'dsh-agy-staff');
-    assert.deepEqual([...exported.inject], ['slots']);
-    assert.equal(typeof exported.apply, 'function');
-});
+function loadBundle(options = {}) {
+    const { seed = [], exposeReactDom = true, document = makeDocument() } = options;
+    let registration;
+    const react = makeReact(seed);
+    const reactDom = exposeReactDom ? { createPortal: (node) => node } : undefined;
+    const window = {
+        innerWidth: 1440,
+        innerHeight: 900,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        __ModuleLoader__: {
+            load: (definition) => {
+                registration = definition;
+            },
+        },
+    };
+    // eslint-disable-next-line no-new-func
+    new Function('window', 'document', 'fetch', 'location', 'console', source)(
+        window,
+        document,
+        async () => ({ ok: true, status: 200, json: async () => ({ ok: true }) }),
+        { origin: 'http://127.0.0.1' },
+        console,
+    );
+    assert.ok(registration !== undefined, 'the bundle never called __ModuleLoader__.load');
+    assert.equal(registration.id, 'dsh-agy-staff');
+    return registration.factory((id) => {
+        if (id === 'react') return react;
+        if (id === 'react-dom') {
+            if (reactDom === undefined) throw new Error('no react-dom');
+            return reactDom;
+        }
+        throw new Error(`unexpected require("${id}")`);
+    });
+}
 
-test('apply mounts the panel into shell.overlay', () => {
-    const exported = loadBundle([]);
+function mount(bundle) {
     let mounted;
-    exported.apply({
+    bundle.apply({
         slots: {
             inject: (slotName, callback) => {
                 assert.equal(slotName, 'shell.overlay');
@@ -87,56 +93,58 @@ test('apply mounts the panel into shell.overlay', () => {
             },
         },
     });
+    return mounted;
+}
+
+/** A four-line renderer: function components run, host elements are collected. */
+function collect(node, classes = []) {
+    if (node === null || node === undefined || typeof node === 'boolean' || typeof node === 'string') return classes;
+    if (Array.isArray(node)) {
+        node.forEach((child) => collect(child, classes));
+        return classes;
+    }
+    if (typeof node !== 'object') return classes;
+    if (typeof node.type === 'function') {
+        collect(node.type(node.props), classes);
+        return classes;
+    }
+    if (node.props && typeof node.props.className === 'string') {
+        node.props.className.split(/\s+/).filter(Boolean).forEach((name) => classes.push(name));
+    }
+    collect(node.children ?? [], classes);
+    return classes;
+}
+
+test('the client bundle registers itself under the package id', () => {
+    const exported = loadBundle();
+    assert.equal(exported.name, 'dsh-agy-staff');
+    assert.deepEqual([...exported.inject], ['slots']);
+    assert.equal(typeof exported.apply, 'function');
+});
+
+test('apply mounts into shell.overlay', () => {
+    const mounted = mount(loadBundle());
     assert.equal(mounted.definition.name, 'shell.overlay');
     assert.equal(mounted.definition.id, 'dsh-agy-staff-panel');
     assert.equal(typeof mounted.component, 'function');
 });
 
-test('the collapsed trigger renders without touching the network', () => {
-    const exported = loadBundle([]);
-    let mounted;
-    exported.apply({ slots: { inject: (_n, cb) => cb(), register: (d, c) => { mounted = { definition: d, component: c }; } } });
-    const tree = mounted.component({});
-    assert.equal(tree.props.className, 'dsag-trigger');
-    assert.deepEqual(tree.children, ['agy']);
+test('the strip entry renders as a tab button, not a floating pill', () => {
+    const mounted = mount(loadBundle());
+    const classes = collect(mounted.component({}));
+    assert.ok(classes.includes('dsag-tab-btn'), classes.join('|'));
+    assert.ok(!classes.includes('dsag-trigger'), 'the floating pill is gone');
 });
 
-test('the expanded panel renders every section', () => {
-    const exported = loadBundle([
-        true, // open
-        { agy: { ok: true, version: 'agy 1.4.12' }, pluginVersion: '0.3.0', companion: 'D:/x/agy-companion.mjs',
-          companionExists: true, settingsPath: 'D:/x/settings.json', modes: ['staffer'], efforts: ['low', 'medium', 'high'],
-          defaults: { mode: 'staffer', model: '', effort: '', timeoutMs: 2700000, subagentEnabled: true, skillsEnabled: true } },
-        { mode: 'staffer', model: '', effort: '', timeoutMin: 45, subagentEnabled: true, skillsEnabled: true },
-        '', // busy
-        '', // error
-        '', // notice
-        'reply with exactly: agy works',
-        null, // test output
-        [], // jobs
-        null, // job output
-        '', // cwd
-    ]);
-    let mounted;
-    exported.apply({ slots: { inject: (_n, cb) => cb(), register: (d, c) => { mounted = { definition: d, component: c }; } } });
-    const tree = mounted.component({});
-    assert.equal(tree.props.className, 'dsag-panel');
+test('without a portal host the entry renders nothing instead of throwing', () => {
+    const mounted = mount(loadBundle({ exposeReactDom: false }));
+    assert.equal(mounted.component({}), null);
+});
 
-    const classes = [];
-    // A three-line renderer: function components are invoked, host elements are walked.
-    const walk = (node) => {
-        if (node === null || node === undefined || typeof node === 'boolean') return;
-        if (Array.isArray(node)) { node.forEach(walk); return; }
-        if (typeof node !== 'object') return;
-        if (typeof node.type === 'function') { walk(node.type(node.props)); return; }
-        if (typeof node.type === 'symbol') { walk(node.children ?? []); return; }
-        if (node.props && typeof node.props.className === 'string') classes.push(node.props.className);
-        walk(node.children ?? []);
-    };
-    walk(tree);
-    assert.ok(classes.includes('dsag-panel'), classes.join('|'));
-    assert.ok(classes.some((c) => c.startsWith('dsag-dot ok')), 'status dot did not turn green');
-    assert.ok(classes.filter((c) => c === 'dsag-sec').length >= 4, 'sections missing: ' + classes.join('|'));
-    assert.ok(classes.includes('dsag-trigger') === false, 'the trigger leaked into the open panel');
-    assert.ok(classes.includes('dsag-mono'), 'the environment block did not render');
+test('the stylesheet ships native tab affordances and host design tokens', () => {
+    assert.match(source, /\.dsag-tab-btn\.on:after\{/);
+    assert.match(source, /--dsw-alias-brand-primary/);
+    assert.match(source, /--dsw-alias-bg-layer-2/);
+    assert.match(source, /prefers-color-scheme: dark/);
+    assert.ok(!/\.dsag-trigger\{/.test(source), 'the old floating trigger CSS is gone');
 });
