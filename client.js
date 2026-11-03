@@ -128,7 +128,7 @@ window.__ModuleLoader__.load({
 		const CSS = `
 .dsag-tab-slot{display:inline-flex;align-items:center;flex:0 0 auto}
 .dsag-tab-btn{appearance:none;position:relative;border:0;background:transparent;cursor:pointer;
-  display:inline-flex;align-items:center;gap:7px;padding:0 2px 9px;margin:0 0 0 20px;
+  display:inline-flex;align-items:center;gap:7px;padding:0 2px 9px;margin:0 0 0 0px;
   font:500 13px/16px system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
   color:var(--dsw-alias-label-tertiary,#64748b);white-space:nowrap;-webkit-text-fill-color:currentColor}
 .dsag-tab-btn:hover{color:var(--dsw-alias-label-primary,#0f172a)}
@@ -149,7 +149,9 @@ window.__ModuleLoader__.load({
   box-shadow:0 0 0 3px rgba(244,63,94,.12);
   box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-state-error-primary,#f43f5e) 12%,transparent)}
 
-.dsag-panel{position:fixed;z-index:2147483000;box-sizing:border-box;width:440px;max-width:calc(100vw - 24px);
+.dsag-host{position:fixed;inset:0;z-index:2147483647;pointer-events:none}
+.dsag-panel{pointer-events:auto}
+.dsag-panel{position:fixed;z-index:2147483647;box-sizing:border-box;width:440px;max-width:calc(100vw - 24px);
   max-height:min(76vh,660px);overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;border-radius:14px;
   background:var(--dsw-alias-bg-layer-2,#ffffff);color:var(--dsw-alias-label-primary,#0f172a);
   border:1px solid var(--dsw-alias-border-l1,rgba(15,23,42,.1));
@@ -473,6 +475,33 @@ window.__ModuleLoader__.load({
 					setBusy("");
 				}
 			}, [cwd]);
+
+			useEffect(() => {
+				// Report the open panel's own layering: a covered region shows up as
+				// `body:false` in `status.panel`, which is otherwise invisible from a shell.
+				const timer = setTimeout(() => {
+					try {
+						const node = document.querySelector(".dsag-panel");
+						if (node === null) return;
+						const rect = node.getBoundingClientRect();
+						const hits = [];
+						for (const probe of [[0.5, 0.06, "head"], [0.5, 0.5, "body"], [0.5, 0.94, "foot"]]) {
+							const hit = document.elementFromPoint(
+								rect.left + rect.width * probe[0],
+								rect.top + rect.height * probe[1],
+							);
+							const mine = hit !== null && hit !== undefined && (hit === node || node.contains(hit));
+							hits.push(probe[2] + ":" + mine);
+						}
+						void api("panel-alive", {
+							version: "open:" + Math.round(rect.width) + "x" + Math.round(rect.height) + " " + hits.join(" "),
+						}).catch(() => {});
+					} catch (error) {
+						void api("panel-alive", { version: "open-probe-error:" + String(error) }).catch(() => {});
+					}
+				}, 500);
+				return () => clearTimeout(timer);
+			}, []);
 
 			useEffect(() => {
 				if (loadedRef.current) return;
@@ -929,6 +958,40 @@ window.__ModuleLoader__.load({
 			}, h("span", { className: dotClass }), "agy");
 		}
 
+		/**
+		 * The panel's own layer. Another chat element (the code-block toolbar) can win
+		 * the paint order when the panel is a plain body child: it may sit in a later
+		 * sibling or carry a bigger z-index. Owning a host that is re-appended to the
+		 * end of <body> and stacking at the maximum index removes both races.
+		 */
+		function panelHost() {
+			if (typeof document === "undefined") return null;
+			let host = document.getElementById("dsag-host");
+			if (host === null) {
+				host = document.createElement("div");
+				host.id = "dsag-host";
+				host.className = "dsag-host";
+			}
+			// appendChild moves an existing node to the end: last sibling wins ties.
+			document.body.appendChild(host);
+			return host;
+		}
+
+		/** Keep the panel layer last while it is open: a hover toolbar can be re-added later. */
+		function useKeepLast(host, active) {
+			useEffect(() => {
+				if (!active || host === null) return undefined;
+				const tick = () => {
+					if (typeof document !== "undefined" && document.body.lastElementChild !== host) {
+						document.body.appendChild(host);
+					}
+				};
+				tick();
+				const interval = setInterval(tick, 800);
+				return () => clearInterval(interval);
+			}, [host, active]);
+		}
+
 		function AgyOverlay() {
 			const host = useTabHost();
 			const [open, setOpen] = useState(false);
@@ -986,6 +1049,8 @@ window.__ModuleLoader__.load({
 
 			// No strip (welcome screen) means no tab row to join: fall back to a small
 			// pill instead of letting a tab-styled button flow into <body>.
+			const panelLayer = open ? panelHost() : null;
+			useKeepLast(panelLayer, open);
 			const target = host !== null ? host : document.body;
 			const entry = host !== null ? tab : h("div", { className: "dsag-fallback" }, tab);
 			const panelStyle = anchor === null
@@ -995,7 +1060,7 @@ window.__ModuleLoader__.load({
 			return h(react.Fragment, null,
 				portal(entry, target),
 				open
-					? portal(h("div", { style: panelStyle }, h(AgyPanel, { onClose: close })), document.body)
+					? portal(h("div", { style: panelStyle }, h(AgyPanel, { onClose: close })), (panelLayer ?? document.body))
 					: null,
 			);
 		}
