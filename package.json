@@ -1,18 +1,24 @@
 {
   "name": "dsh-agy-staff",
-  "version": "0.2.0",
-  "description": "Hire Google's Antigravity CLI (agy) from DeepSeek Harness: seven /agy-* skills plus an `agy` subagent provider — ask, staffer, researcher, reviewer, implementer, lead, jobs.",
+  "version": "0.3.0",
+  "description": "Hire Google's Antigravity CLI (agy) from DeepSeek Harness: seven /agy-* skills, an `agy` subagent provider, and a control panel to drive both.",
   "license": "MIT",
   "type": "module",
   "main": "index.js",
   "exports": {
     ".": "./index.js",
+    "./client": "./client.js",
+    "./ui": "./agy-ui.js",
+    "./settings": "./agy-settings.js",
     "./agy-subagent": "./agy-subagent.js",
     "./package.json": "./package.json"
   },
   "files": [
     "index.js",
     "agy-subagent.js",
+    "agy-settings.js",
+    "agy-ui.js",
+    "client.js",
     "cordis.patch.yml",
     "assets",
     "README.md",
@@ -23,6 +29,13 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-slots"
+      ],
+      "immediately": true
     }
   },
   "scripts": {
@@ -42,6 +55,7 @@
     "antigravity",
     "gemini",
     "skills",
-    "subagent"
+    "subagent",
+    "panel"
   ]
 }

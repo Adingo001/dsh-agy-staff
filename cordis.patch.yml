@@ -5,6 +5,8 @@
 # Row 2 builds the delegation tool from that provider, so `agy` is a first-class
 # agent kind next to `subagent` and `subagent_fork` instead of a shell command
 # the model has to assemble and babysit.
+# Row 3 is the control panel's host half: `POST /agy/api`, which the browser
+# bundle (client.js, `shell.overlay` slot) posts to.
 - insert:
     - id: dsh-agy-staff
       name: dsh-agy-staff
@@ -17,3 +19,6 @@
         provider: agy
         toolName: agy
         maxDepth: provider-managed
+
+    - id: dsh-agy-staff-ui
+      name: dsh-agy-staff/ui

@@ -6,7 +6,7 @@
 
 <p align="center">A DeepSeek Harness bundle that hires <a href="https://github.com/keli-wen/agy-staff">agy-staff</a>'s personas as seven skills — <code>/agy-ask</code>, <code>/agy-staffer</code>, <code>/agy-researcher</code>, <code>/agy-reviewer</code>, <code>/agy-implementer</code>, plus <code>/agy-lead</code> and <code>/agy-jobs</code>.</p>
 
-**[Why](#-why) · [Install](#install) · [Usage](#cujs) · [Core design](#core-design) · [Updating](#updating) · [Troubleshooting](#troubleshooting) · [Credits](#credits)**
+**[Why](#-why) · [Install](#install) · [Usage](#cujs) · [Core design](#core-design) · [Control panel](#control-panel) · [Updating](#updating) · [Troubleshooting](#troubleshooting) · [Credits](#credits)**
 
 ## What & Why
 
@@ -32,6 +32,7 @@ Nothing is written into `~/.dsh/skills`, nothing is junctioned, and no upstream 
 | Shared resources | `<plugin-root>/companion` | `resourceBase` → `<pkg>/assets/` |
 | Taking effect | next session | **restart the app** (bundles load at host start) |
 | Agent surface | not applicable | `agy` subagent provider + tool: delegate without a shell command |
+| Settings | host plugin settings | round **agy** panel: mode/model/effort/timeout, job list, live test |
 
 ## Install
 
@@ -92,6 +93,20 @@ Only `ask` blocks. The rest return a job id; the companion's `wait` collects the
 - **Prose is localized at load.** Upstream bodies say `/agy:ask`; the provider rewrites that to `/agy-ask` in descriptions and bodies, leaving the vendored files byte-identical to upstream.
 - **Upstream is vendored, not copied at install.** `assets/` holds the personas, companion, templates and reference docs at the commit recorded in `assets/UPSTREAM-COMMIT`; `NOTICE` spells out what came from where.
 
+## Control panel
+
+The bundle ships a small panel in the browser client (`dsh.client` → `client.js`, registered into the `shell.overlay` slot) and one host route to feed it: `POST /agy/api`. After a restart a round **agy** button sits above the composer.
+
+| Panel section | What it does |
+|---|---|
+| 环境 | companion path (✓/✗), `agy --version`, plugin version, settings path |
+| 委派配置 | mode (`staffer`/`research`/`review`/`implement`/`ask`), reasoning effort, model override, timeout; two toggles for the `agy` subagent and the `/agy-*` skills |
+| 连通性测试 | one `ask` round trip with its wall time — the "is agy actually working" button |
+| 作业 | recent jobs from `<cwd>/.agy-staff/state.json`, with **结果** and **取消** |
+
+Every saved value is read per delegation from `<dshHome>/agy-staff/settings.json`, so **保存 takes effect on the next call, no restart**. Only the bundle rows (the panel itself, the tool, the providers) are fixed at app start.
+
+The route is same-origin only: a cross-site request is rejected on `Origin`/`Sec-Fetch-Site`, and `content-type: application/json` is required, so a random page cannot drive agy through the loopback interface.
 ## Updating
 
 Upstream moved:

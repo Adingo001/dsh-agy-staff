@@ -1,9 +1,14 @@
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import { ASSETS_PATH, COMPANION_PATH, PREFIX, PROVIDER_NAME, provider } from '../index.js';
+// Isolate from the machine's real panel settings, then load the modules.
+process.env.DSH_HOME = mkdtempSync(path.join(tmpdir(), 'agy-provider-'));
+
+const { ASSETS_PATH, COMPANION_PATH, PREFIX, PROVIDER_NAME, provider } = await import('../index.js');
+const settings = await import('../agy-settings.js');
 
 const EXPECTED = [
     'agy-ask',
@@ -86,4 +91,12 @@ test('unknown candidates fail loudly', async () => {
 
 test('the prefix matches the slash menu contract', () => {
     assert.equal(PREFIX, 'agy-');
+});
+
+test('the panel toggle hides the skills', async () => {
+    settings.writeSettings({ skillsEnabled: false });
+    assert.deepEqual(await provider.list(), []);
+    await assert.rejects(() => provider.get({ name: 'agy-ask' }), /disabled in the agy control panel/);
+    settings.writeSettings({ skillsEnabled: true });
+    assert.equal((await provider.list()).length, 7);
 });

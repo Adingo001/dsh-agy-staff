@@ -18,6 +18,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { createAgyProvider } from './agy-subagent.js';
+import { readSettings } from './agy-settings.js';
 
 /** Provider id, also the `provider` field of every candidate. */
 const PROVIDER_NAME = 'agy-staff';
@@ -176,10 +177,12 @@ const provider = {
     name: PROVIDER_NAME,
 
     async list() {
+        if (!readSettings().skillsEnabled) return [];
         return (await loadSkills()).map((skill) => skill.candidate);
     },
 
     async get(candidate) {
+        if (!readSettings().skillsEnabled) throw new Error('dsh-agy-staff: skills are disabled in the agy control panel');
         const skill = (await loadSkills()).find((entry) => entry.candidate.name === candidate.name);
         if (skill === undefined) throw new Error(`dsh-agy-staff: unknown skill "${candidate.name}"`);
 

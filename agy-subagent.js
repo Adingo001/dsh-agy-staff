@@ -29,6 +29,8 @@ import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
+import { readSettings } from './agy-settings.js';
+
 /** Registered provider name; the `dsh-tool-subagent` row must select this. */
 export const SUBAGENT_NAME = 'agy';
 
@@ -107,10 +109,26 @@ export class AgySubagentProvider {
      */
     constructor(options = {}) {
         this.companion = options.companion ?? process.env.DSH_AGY_COMPANION ?? DEFAULT_COMPANION;
-        this.mode = options.mode ?? process.env.DSH_AGY_SUBAGENT_MODE ?? 'staffer';
-        this.timeoutMs = options.timeoutMs ?? envInt('DSH_AGY_SUBAGENT_TIMEOUT_MS', 45 * 60 * 1000);
-        this.waitSliceSeconds = options.waitSliceSeconds ?? envInt('DSH_AGY_WAIT_SLICE_SECONDS', 90);
-        this.pollMs = options.pollMs ?? envInt('DSH_AGY_SUBAGENT_POLL_MS', 1000);
+        // Explicit construction options win (tests); otherwise every delegation
+        // reads the live panel settings, so 「保存」 applies without a restart.
+        this.modeOverride = options.mode ?? (process.env.DSH_AGY_SUBAGENT_MODE || undefined);
+        this.timeoutOverride = options.timeoutMs;
+        this.waitSliceOverride = options.waitSliceSeconds;
+        this.pollOverride = options.pollMs;
+    }
+
+    /** The mode/model/effort/timeout one delegation runs with, right now. */
+    settings() {
+        const live = readSettings();
+        return {
+            enabled: live.subagentEnabled,
+            mode: this.modeOverride === undefined || this.modeOverride === '' ? live.mode : this.modeOverride,
+            model: live.model,
+            effort: live.effort,
+            timeoutMs: this.timeoutOverride ?? live.timeoutMs,
+            waitSliceSeconds: this.waitSliceOverride ?? live.waitSliceSeconds,
+            pollMs: this.pollOverride ?? live.pollMs,
+        };
     }
 
     /**
@@ -132,14 +150,21 @@ export class AgySubagentProvider {
 
         let jobId;
         let disposal;
+        const config = this.settings();
 
         const result = (async () => {
             if (prompt.trim() === '') {
                 return { output: '', diagnostic: 'agy delegation needs a non-empty prompt', stopReason: 'error' };
             }
+            if (!config.enabled) {
+                return { output: '', diagnostic: 'agy subagent is disabled in the agy control panel', stopReason: 'error' };
+            }
             try {
                 if (controller.signal.aborted) return { output: '', stopReason: 'aborted' };
-                const dispatched = await this.exec([this.mode, '--prompt', prompt], { cwd, signal: controller.signal, children });
+                const dispatchArgs = [config.mode, '--prompt', prompt];
+                if (config.model !== '') dispatchArgs.push('--model', config.model);
+                else if (config.effort !== '') dispatchArgs.push('--effort', config.effort);
+                const dispatched = await this.exec(dispatchArgs, { cwd, signal: controller.signal, children });
                 const started = parseJobId(dispatched.stdout);
                 if (controller.signal.aborted) return { output: '', stopReason: 'aborted' };
                 if (dispatched.code !== 0 || started === undefined) {
@@ -150,7 +175,7 @@ export class AgySubagentProvider {
                 }
                 jobId = started;
 
-                const deadline = Date.now() + this.timeoutMs;
+                const deadline = Date.now() + config.timeoutMs;
                 for (;;) {
                     if (controller.signal.aborted) return { output: '', stopReason: 'aborted' };
 
@@ -170,10 +195,10 @@ export class AgySubagentProvider {
                         return {
                             output: '',
                             stopReason: 'error',
-                            diagnostic: `agy job ${jobId} still running after ${this.timeoutMs} ms; collect it with the jobs skill or raise DSH_AGY_SUBAGENT_TIMEOUT_MS`,
+                            diagnostic: `agy job ${jobId} still running after ${config.timeoutMs} ms; collect it with the jobs skill or raise the timeout in the agy panel`,
                         };
                     }
-                    await delay(this.pollMs, controller.signal);
+                    await delay(config.pollMs, controller.signal);
                 }
             } catch (error) {
                 if (controller.signal.aborted) return { output: '', stopReason: 'aborted' };

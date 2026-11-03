@@ -6,7 +6,7 @@
 
 <p align="center">一个 DeepSeek Harness 插件（bundle），把 <a href="https://github.com/keli-wen/agy-staff">agy-staff</a> 的 personas 装成七个技能：<code>/agy-ask</code>、<code>/agy-staffer</code>、<code>/agy-researcher</code>、<code>/agy-reviewer</code>、<code>/agy-implementer</code>，外加 <code>/agy-lead</code> 和 <code>/agy-jobs</code>。</p>
 
-**[为什么 · 安装 · 用法 · 原理 · 更新 · 排错 · 鸣谢](#为什么)**
+**[为什么 · 安装 · 用法 · 原理 · 控制面板 · 更新 · 排错 · 鸣谢](#为什么)**
 
 ## 为什么
 
@@ -32,6 +32,7 @@ dsh-agy-staff（bundle patch）
 | 共享资源 | `<plugin-root>/companion` | `resourceBase` → `<pkg>/assets/` |
 | 生效时机 | 下一次会话 | **重启应用**（bundle 在宿主启动时加载） |
 | 智能体形态 | 无 | `agy` 子智能体 provider + 工具：不用拼 shell 命令也能派活 |
+| 设置 | 宿主插件设置 | 圆形 **agy** 面板：模式/模型/强度/超时、作业列表、在线自测 |
 
 ## 安装
 
@@ -92,6 +93,20 @@ node "$env:USERPROFILE\.dsh\profiles\desktop\node_modules\dsh-agy-staff\assets\c
 - **文案在加载时本地化。** 上游正文写的是 `/agy:ask`；provider 在 description 和正文里改写成 `/agy-ask`，磁盘上的 vendored 文件保持与上游逐字节一致。
 - **上游是 vendored，而不是安装时才拷。** `assets/` 里是 personas、companion、templates 和参考文档，版本记在 `assets/UPSTREAM-COMMIT`；`NOTICE` 写清了每一块的来源。
 
+## 控制面板
+
+bundle 里带一个浏览器端小面板（`dsh.client` → `client.js`，注册进 `shell.overlay` 槽位）和一条给它喂数据的宿主路由：`POST /agy/api`。重启后输入框右侧上方会多一个圆形 **agy** 按钮。
+
+| 面板区 | 作用 |
+|---|---|
+| 环境 | companion 路径（✓/✗）、`agy --version`、插件版本、配置文件路径 |
+| 委派配置 | 模式（`staffer`/`research`/`review`/`implement`/`ask`）、推理强度、模型覆盖、超时；两个开关分别管 `agy` 子智能体和 `/agy-*` 技能 |
+| 连通性测试 | 跑一次 `ask` 并显示耗时 —— 「agy 到底通不通」按钮 |
+| 作业 | 从 `<cwd>/.agy-staff/state.json` 读最近作业，可**看结果**、可**取消** |
+
+保存的值每次委派都从 `<dshHome>/agy-staff/settings.json` 现读，所以**保存即时生效，不用重启**；只有 bundle 行（面板本身、工具、两个 provider）是应用启动时固定的。
+
+路由只认同源：跨站在 `Origin`/`Sec-Fetch-Site` 上就被拒，且必须 `content-type: application/json` —— 随便哪个网页都没法通过回环地址驱动 agy。
 ## 更新
 
 上游有更新：
