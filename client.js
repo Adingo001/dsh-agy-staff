@@ -36,12 +36,12 @@ window.__ModuleLoader__.load({
 		/* ---------------------------------------------------------------- style */
 
 		const CSS = `
-.dsag-trigger{position:fixed;right:18px;bottom:96px;z-index:70;pointer-events:auto;display:flex;align-items:center;justify-content:center;
-  width:44px;height:44px;border-radius:22px;border:1px solid rgba(129,140,248,.45);cursor:pointer;
-  background:linear-gradient(135deg,#4f46e5,#22d3ee);color:#fff;font:600 12px/1 ui-sans-serif,system-ui,"Segoe UI",sans-serif;
-  letter-spacing:.02em;box-shadow:0 6px 18px rgba(15,23,42,.35)}
+.dsag-trigger{position:fixed;right:18px;bottom:132px;z-index:2147483000;pointer-events:auto;display:flex;align-items:center;justify-content:center;gap:6px;
+  min-width:44px;height:40px;padding:0 13px;border-radius:20px;border:1px solid rgba(129,140,248,.55);cursor:pointer;
+  background:linear-gradient(135deg,#4f46e5,#22d3ee);color:#fff;font:700 13px/1 ui-sans-serif,system-ui,"Segoe UI",sans-serif;
+  letter-spacing:.04em;box-shadow:0 8px 22px rgba(15,23,42,.45),0 0 0 3px rgba(79,70,229,.16)}
 .dsag-trigger:hover{filter:brightness(1.08)}
-.dsag-panel{position:fixed;right:18px;bottom:150px;z-index:71;pointer-events:auto;width:432px;max-height:72vh;overflow:auto;
+.dsag-panel{position:fixed;right:18px;bottom:186px;z-index:2147483001;pointer-events:auto;width:432px;max-height:72vh;overflow:auto;
   border-radius:14px;border:1px solid rgba(99,102,241,.35);background:#0b1220;color:#e2e8f0;
   font:12px/1.55 ui-sans-serif,system-ui,"Segoe UI",sans-serif;box-shadow:0 18px 48px rgba(2,6,23,.55)}
 .dsag-head{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid rgba(99,102,241,.22)}
@@ -88,7 +88,13 @@ window.__ModuleLoader__.load({
 
 		function ensureStyle() {
 			if (typeof document === "undefined") return;
-			if (document.getElementById(STYLE_ID) !== null) return;
+			const existing = document.getElementById(STYLE_ID);
+			if (existing !== null) {
+				// HMR reloads this module without a page refresh, so the shipped CSS
+				// must be able to replace what the previous generation injected.
+				if (existing.textContent !== CSS) existing.textContent = CSS;
+				return;
+			}
 			const tag = document.createElement("style");
 			tag.id = STYLE_ID;
 			tag.textContent = CSS;
@@ -365,12 +371,27 @@ window.__ModuleLoader__.load({
 
 		/* ----------------------------------------------------------------- apply */
 
-		/** Is the panel actually in the document? The one question only the DOM can answer. */
-		function mountedInDocument() {
+		/**
+		 * Where the panel ended up, as the DOM sees it. The host records this in
+		 * `status.panel`, so "the button is missing" becomes a measurable fact
+		 * instead of a screenshot argument.
+		 */
+		function panelGeometry() {
 			try {
-				return document.querySelector(".dsag-trigger") !== null || document.querySelector(".dsag-panel") !== null;
-			} catch {
-				return false;
+				const node = document.querySelector(".dsag-trigger") || document.querySelector(".dsag-panel");
+				if (node === null) return undefined;
+				const rect = node.getBoundingClientRect();
+				const visible = rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.right > 0
+					&& rect.top < window.innerHeight && rect.left < window.innerWidth;
+				// A visible rect can still be covered: ask the document who owns that point.
+				let topmost = false;
+				try {
+					const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+					topmost = hit !== null && (hit === node || node.contains(hit));
+				} catch {}
+				return `x${Math.round(rect.left)},y${Math.round(rect.top)},w${Math.round(rect.width)},h${Math.round(rect.height)},visible:${visible},topmost:${topmost}`;
+			} catch (error) {
+				return `probe-error:${String(error)}`;
 			}
 		}
 
@@ -381,7 +402,7 @@ window.__ModuleLoader__.load({
 		 */
 		function mountFallback(reason) {
 			try {
-				if (mountedInDocument()) return false;
+				if (panelGeometry() !== undefined) return false;
 				const createRoot = require("react-dom/client").createRoot;
 				const host = document.createElement("div");
 				host.id = "dsh-agy-staff-root";
@@ -390,11 +411,11 @@ window.__ModuleLoader__.load({
 				host.style.pointerEvents = "none";
 				document.body.appendChild(host);
 				createRoot(host).render(h(AgyPanel, null));
-				void api("panel-alive", { version: "client", mount: "fallback", reason: String(reason) }).catch(() => {});
+				void api("panel-alive", { version: "fallback:" + String(reason) + ":" + (panelGeometry() || "no-node") }).catch(() => {});
 				return true;
 			} catch (error) {
 				console.warn("[dsh-agy-staff] fallback mount failed:", error);
-				void api("panel-alive", { version: "client", mount: "failed", reason: String(error) }).catch(() => {});
+				void api("panel-alive", { version: "failed:" + String(error) }).catch(() => {});
 				return false;
 			}
 		}
@@ -402,7 +423,7 @@ window.__ModuleLoader__.load({
 		function apply(ctx) {
 			// Hello to the host half: proves in `status` that the browser bundle
 			// actually ran, which is otherwise invisible from a shell.
-			void api("panel-alive", { version: "client", mount: "boot" }).catch(() => {});
+			void api("panel-alive", { version: "boot" }).catch(() => {});
 
 			const register = () => {
 				try {
@@ -412,8 +433,9 @@ window.__ModuleLoader__.load({
 				}
 				// The slot host may swallow or clip us; verify against the document.
 				setTimeout(() => {
-					if (mountedInDocument()) {
-						void api("panel-alive", { version: "client", mount: "slot" }).catch(() => {});
+					const geometry = panelGeometry();
+					if (geometry !== undefined) {
+						void api("panel-alive", { version: "slot:" + geometry }).catch(() => {});
 						return;
 					}
 					mountFallback("slot did not render");

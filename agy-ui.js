@@ -185,6 +185,8 @@ export async function dispatch(request, context = {}) {
                 panelHeartbeat = {
                     at: new Date().toISOString(),
                     version: typeof request.version === 'string' ? request.version : '',
+                    mount: typeof request.mount === 'string' ? request.mount : undefined,
+                    reason: typeof request.reason === 'string' ? request.reason : undefined,
                 };
                 return { ok: true, panel: panelHeartbeat };
             case 'get':
