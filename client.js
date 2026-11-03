@@ -108,7 +108,7 @@ window.__ModuleLoader__.load({
 .dsag-tab-btn.on{color:var(--dsw-alias-brand-primary,#4f46e5)}
 .dsag-tab-btn.on:after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;border-radius:2px;
   background:var(--dsw-alias-brand-primary,#4f46e5)}
-.dsag-dot{width:6px;height:6px;border-radius:3px;background:var(--dsw-alias-label-caption,#94a3b8);flex:0 0 auto}
+.dsag-fallback{position:fixed;right:16px;bottom:96px;z-index:2147483000}\n.dsag-fallback .dsag-tab-btn{margin:0;padding:7px 12px;min-height:32px;border-radius:16px;\n  background:var(--dsw-alias-brand-primary,#4f46e5);color:var(--dsw-alias-label-primary-inverted,#fff)}\n.dsag-fallback .dsag-tab-btn.on:after{display:none}\n.dsag-dot{width:6px;height:6px;border-radius:3px;background:var(--dsw-alias-label-caption,#94a3b8);flex:0 0 auto}
 .dsag-dot.ok{background:var(--dsw-alias-state-success-primary,#10b981)}
 .dsag-dot.bad{background:var(--dsw-alias-state-error-primary,#f43f5e)}
 
@@ -548,13 +548,16 @@ window.__ModuleLoader__.load({
 			const tab = h("span", { ref: chipRef },
 				h(AgyTab, { open: open, healthy: healthy, onToggle: toggle }));
 
+			// No strip (welcome screen) means no tab row to join: fall back to a small
+			// pill instead of letting a tab-styled button flow into <body>.
 			const target = host !== null ? host : document.body;
+			const entry = host !== null ? tab : h("div", { className: "dsag-fallback" }, tab);
 			const panelStyle = anchor === null
 				? { position: "fixed", left: 24, top: 64 }
 				: { position: "fixed", left: anchor.left + "px", top: anchor.top + "px" };
 
 			return h(react.Fragment, null,
-				portal(tab, target),
+				portal(entry, target),
 				open
 					? portal(h("div", { style: panelStyle }, h(AgyPanel, { onClose: close })), document.body)
 					: null,
