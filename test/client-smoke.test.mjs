@@ -145,6 +145,25 @@ test('the stylesheet ships native tab affordances and host design tokens', () =>
     assert.match(source, /\.dsag-tab-btn\.on:after\{/);
     assert.match(source, /--dsw-alias-brand-primary/);
     assert.match(source, /--dsw-alias-bg-layer-2/);
-    assert.match(source, /prefers-color-scheme: dark/);
     assert.ok(!/\.dsag-trigger\{/.test(source), 'the old floating trigger CSS is gone');
+});
+
+test('themability comes from host tokens, not from the OS preference', () => {
+    // The host tokens already switch with the app theme; a prefers-color-scheme
+    // block would flip the panel to dark on a light UI whenever the OS is dark.
+    assert.ok(!/@media\s*\(prefers-color-scheme/.test(source), 'no OS-driven theme block');
+    const tokens = new Set((source.match(/--dsw-alias-[a-z0-9-]+/g) ?? []));
+    const known = new Set([
+        '--dsw-alias-bg-base', '--dsw-alias-bg-layer-1', '--dsw-alias-bg-layer-2', '--dsw-alias-bg-layer-3',
+        '--dsw-alias-settings-card-fill', '--dsw-alias-markdown-code-block',
+        '--dsw-alias-label-primary', '--dsw-alias-label-secondary', '--dsw-alias-label-tertiary',
+        '--dsw-alias-label-caption', '--dsw-alias-label-primary-inverted',
+        '--dsw-alias-border-l1', '--dsw-alias-border-l2', '--dsw-alias-border-l3',
+        '--dsw-alias-brand-primary', '--dsw-alias-button-primary-fill', '--dsw-alias-link',
+        '--dsw-alias-state-success-primary', '--dsw-alias-state-error-primary', '--dsw-alias-state-warn-primary',
+        '--dsw-alias-interactive-bg-hover',
+    ]);
+    for (const token of tokens) {
+        assert.ok(known.has(token), `unknown host token: ${token}`);
+    }
 });
