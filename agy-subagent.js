@@ -29,7 +29,9 @@ import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
-import { readSettings } from './agy-settings.js';
+import { admit } from './agy-admission.js';
+import { record } from './agy-ledger.js';
+import { readSettings, settingsVersion } from './agy-settings.js';
 
 /** Registered provider name; the `dsh-tool-subagent` row must select this. */
 export const SUBAGENT_NAME = 'agy';
@@ -115,6 +117,12 @@ export class AgySubagentProvider {
         this.timeoutOverride = options.timeoutMs;
         this.waitSliceOverride = options.waitSliceSeconds;
         this.pollOverride = options.pollMs;
+        /**
+         * Live delegations by run id. The admission layer asks for a count instead of
+         * reading this set, which keeps the decision function pure; the provider is the
+         * only thing that knows what is actually in flight.
+         */
+        this.running = new Set();
     }
 
     /** The mode/model/effort/timeout one delegation runs with, right now. */
@@ -128,6 +136,8 @@ export class AgySubagentProvider {
             timeoutMs: this.timeoutOverride ?? live.timeoutMs,
             waitSliceSeconds: this.waitSliceOverride ?? live.waitSliceSeconds,
             pollMs: this.pollOverride ?? live.pollMs,
+            maxConcurrent: live.maxConcurrent,
+            version: settingsVersion(live),
         };
     }
 
@@ -152,57 +162,119 @@ export class AgySubagentProvider {
         let disposal;
         const config = this.settings();
 
+        const ledgerCwd = typeof cwd === 'string' && cwd !== '' ? cwd : process.cwd();
+        this.running.add(id);
+
+        /** The message a human reads after the machine-readable code. */
+        const refusalDetail = (code) => {
+            if (code === 'empty_prompt') return 'agy delegation needs a non-empty prompt';
+            if (code === 'subagent_disabled') return 'agy subagent is disabled in the agy control panel';
+            if (code === 'prompt_too_long') return `the task text is too long for one delegation`;
+            if (code === 'mode_unknown') return 'the configured companion mode is not one this bundle knows';
+            if (code === 'secret_in_prompt') return 'the task text looks like it carries a credential';
+            return 'the delegation budget of concurrent runs is used up';
+        };
+
         const result = (async () => {
-            if (prompt.trim() === '') {
-                return { output: '', diagnostic: 'agy delegation needs a non-empty prompt', stopReason: 'error' };
+            const verdict = admit(
+                { prompt, inFlight: this.running.size - 1 },
+                { subagentEnabled: config.enabled, mode: config.mode, maxConcurrent: config.maxConcurrent },
+            );
+            if (!verdict.admissible) {
+                record(ledgerCwd, {
+                    kind: 'refused',
+                    reason: verdict.reason,
+                    basis: 'admission',
+                    settingsVersion: config.version,
+                    jobId: id,
+                });
+                return {
+                    output: '',
+                    diagnostic: `AGY_REFUSED ${verdict.reason.code}: ${refusalDetail(verdict.reason.code)}`,
+                    stopReason: 'error',
+                };
             }
-            if (!config.enabled) {
-                return { output: '', diagnostic: 'agy subagent is disabled in the agy control panel', stopReason: 'error' };
-            }
+
+            record(ledgerCwd, {
+                kind: 'spawned',
+                basis: verdict.basis,
+                settingsVersion: config.version,
+                jobId: id,
+            });
+
+            /** Set once the wait loop notices the panel changed a delegation setting. */
+            let drift;
+
+            /**
+             * Prefix the drift note onto a settled result. Appending rather than
+             * replacing keeps a genuine failure reason intact; `stopReason` is never
+             * rewritten because the subagent contract only allows three values.
+             */
+            const finish = (value) => {
+                if (drift === undefined) return value;
+                const note = `AGY_SETTINGS_DRIFTED ${drift.from} ${drift.to}`;
+                return {
+                    ...value,
+                    diagnostic: value.diagnostic === undefined ? note : `${note}: ${value.diagnostic}`,
+                };
+            };
+
             try {
-                if (controller.signal.aborted) return { output: '', stopReason: 'aborted' };
+                if (controller.signal.aborted) return finish({ output: '', stopReason: 'aborted' });
                 const dispatchArgs = [config.mode, '--prompt', prompt];
                 if (config.model !== '') dispatchArgs.push('--model', config.model);
                 else if (config.effort !== '') dispatchArgs.push('--effort', config.effort);
                 const dispatched = await this.exec(dispatchArgs, { cwd, signal: controller.signal, children });
                 const started = parseJobId(dispatched.stdout);
-                if (controller.signal.aborted) return { output: '', stopReason: 'aborted' };
+                if (controller.signal.aborted) return finish({ output: '', stopReason: 'aborted' });
                 if (dispatched.code !== 0 || started === undefined) {
                     const output = (dispatched.stdout || dispatched.stderr).trim();
-                    return dispatched.code === 0
+                    return finish(dispatched.code === 0
                         ? { output, stopReason: 'completed' }
-                        : { output, stopReason: 'error', diagnostic: clip(dispatched.stderr || dispatched.stdout) };
+                        : { output, stopReason: 'error', diagnostic: clip(dispatched.stderr || dispatched.stdout) });
                 }
                 jobId = started;
 
                 const deadline = Date.now() + config.timeoutMs;
                 for (;;) {
-                    if (controller.signal.aborted) return { output: '', stopReason: 'aborted' };
+                    if (controller.signal.aborted) return finish({ output: '', stopReason: 'aborted' });
+
+                    // The panel saves settings live; a changed delegation fingerprint means
+                    // this run is now governed by values the caller never saw.
+                    const currentVersion = settingsVersion(readSettings());
+                    if (drift === undefined && currentVersion !== config.version) {
+                        drift = { from: config.version, to: currentVersion };
+                        record(ledgerCwd, { kind: 'settings_drifted', values: drift, jobId: id });
+                    }
 
                     const waited = await this.exec(
-                        ['wait', jobId, '--timeout', `${this.waitSliceSeconds}s`],
+                        ['wait', jobId, '--timeout', `${config.waitSliceSeconds}s`],
                         { cwd, signal: controller.signal, children },
                     );
-                    if (waited.code === 0) return { output: waited.stdout.trim(), stopReason: 'completed' };
+                    if (waited.code === 0) return finish({ output: waited.stdout.trim(), stopReason: 'completed' });
                     if (waited.code !== 2) {
-                        return {
+                        return finish({
                             output: waited.stdout.trim(),
                             stopReason: controller.signal.aborted ? 'aborted' : 'error',
                             ...(controller.signal.aborted ? {} : { diagnostic: clip(waited.stderr || waited.stdout) }),
-                        };
+                        });
                     }
                     if (Date.now() >= deadline) {
-                        return {
+                        return finish({
                             output: '',
                             stopReason: 'error',
                             diagnostic: `agy job ${jobId} still running after ${config.timeoutMs} ms; collect it with the jobs skill or raise the timeout in the agy panel`,
-                        };
+                        });
                     }
                     await delay(config.pollMs, controller.signal);
                 }
             } catch (error) {
-                if (controller.signal.aborted) return { output: '', stopReason: 'aborted' };
-                return { output: '', stopReason: 'error', diagnostic: clip(String(error?.message ?? error)) };
+                if (controller.signal.aborted) return finish({ output: '', stopReason: 'aborted' });
+                return finish({ output: '', stopReason: 'error', diagnostic: clip(String(error?.message ?? error)) });
+            } finally {
+                // The slot is released on every settle path, including a refusal that
+                // never spawned anything, so the counter can only drift downward.
+                this.running.delete(id);
             }
         })();
 
@@ -212,6 +284,7 @@ export class AgySubagentProvider {
             dispose: () => {
                 if (disposal !== undefined) return disposal;
                 if (request.signal !== undefined) request.signal.removeEventListener('abort', onAbort);
+                this.running.delete(id);
                 controller.abort(new Error('agy subagent disposed'));
                 for (const child of children) {
                     try {

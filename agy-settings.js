@@ -9,6 +9,7 @@
  *
  * @module dsh-agy-staff/agy-settings
  */
+import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -29,6 +30,7 @@ export const DEFAULTS = Object.freeze({
     pollMs: 1000,
     subagentEnabled: true,
     skillsEnabled: true,
+    maxConcurrent: 0,
 });
 
 /** `$DSH_HOME`, falling back to `~/.dsh` (Windows has no HOME). */
@@ -40,6 +42,38 @@ export function dshHome() {
 /** Absolute path of the settings file. */
 export function settingsPath() {
     return join(dshHome(), 'agy-staff', 'settings.json');
+}
+
+/**
+ * The fields a running delegation depends on. A change to any of them makes an
+ * in-flight run's assumptions stale, which is why the provider compares this
+ * version on every wait slice instead of trusting the value it read at start.
+ *
+ * `skillsEnabled` is deliberately absent: it only affects which skills the menu
+ * lists, so flipping it must not mark live delegations as drifted.
+ */
+export const DELEGATION_KEYS = Object.freeze([
+    'mode',
+    'model',
+    'effort',
+    'timeoutMs',
+    'waitSliceSeconds',
+    'pollMs',
+    'subagentEnabled',
+]);
+
+/**
+ * A short, comparable fingerprint of the delegation-relevant settings.
+ * Twelve hex characters keep ledger lines readable while staying far apart for the
+ * handful of edits one checkout ever sees.
+ *
+ * @param {Record<string, unknown>} [settings] defaults are filled in from DEFAULTS
+ * @returns {string}
+ */
+export function settingsVersion(settings) {
+    const source = settings !== null && typeof settings === 'object' ? settings : {};
+    const pairs = DELEGATION_KEYS.map((key) => [key, source[key] === undefined ? DEFAULTS[key] : source[key]]);
+    return createHash('sha256').update(JSON.stringify(pairs)).digest('hex').slice(0, 12);
 }
 
 let cache;
@@ -79,6 +113,11 @@ function coerce(key, value) {
             const n = Number(value);
             if (!Number.isFinite(n) || n < 200 || n > 10_000) throw new Error('pollMs must be 200..10000');
             return Math.floor(n);
+        }
+        case 'maxConcurrent': {
+            const n = Number(value);
+            if (!Number.isInteger(n) || n < 0 || n > 8) throw new Error('maxConcurrent must be an integer 0..8');
+            return n;
         }
         case 'subagentEnabled':
         case 'skillsEnabled':

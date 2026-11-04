@@ -21,6 +21,7 @@ import { spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
+import { readDecisions } from './agy-ledger.js';
 import { EFFORTS, MODES, dshHome, readSettings, settingsPath, writeSettings } from './agy-settings.js';
 
 export const name = 'agy-staff-ui';
@@ -258,6 +259,12 @@ export async function dispatch(request, context = {}) {
                     timeoutMs: 120_000,
                 });
                 return { ok: result.code === 0, output: (result.stdout || result.stderr).trim().slice(-4000) };
+            }
+            case 'decisions': {
+                // Read-only view of the admission ledger; the panel shows why a delegation
+                // was refused and the model can be asked to explain its own history.
+                const cwd = typeof request.cwd === 'string' && request.cwd !== '' ? request.cwd : defaultCwd;
+                return { ok: true, cwd, decisions: readDecisions(cwd, 50) };
             }
             case 'get':
                 return { ok: true, settings: readSettings(), modes: [...MODES], efforts: [...EFFORTS] };
