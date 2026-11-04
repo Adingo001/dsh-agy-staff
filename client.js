@@ -679,8 +679,7 @@ window.__ModuleLoader__.load({
 			const dotClass = status === null ? "dsag-dot" : healthy ? "dsag-dot ok" : "dsag-dot bad";
 			const healthSummary = status === null
 				? "读取中…"
-				: (healthy ? "agy " + status.agy.version : (status.agy && status.agy.error) || "agy 不可用")
-					+ " · companion " + (status.companionExists ? "✓" : "✗");
+				: (healthy ? "agy " + status.agy.version : (status.agy && status.agy.error) || "agy 不可用");
 			const healthTitle = status === null
 				? healthSummary
 				: healthSummary + "\n" + status.companion + "\n" + status.settingsPath;
@@ -935,11 +934,11 @@ window.__ModuleLoader__.load({
 									className: "dsag-btn dsag-btn-ghost dsag-foot-btn",
 									disabled: busy !== "",
 									onClick: () => void digUpdate(),
-								}, "让 agy 抓一下"),
+								}, "用 agy 读更新"),
 							)
 							: null,
 					),
-					h("span", { className: "dsag-foot-hint" }, "保存后下次委派生效"),
+	
 				),
 			);
 		}
