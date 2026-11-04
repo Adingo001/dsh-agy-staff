@@ -100,7 +100,7 @@ bundle 里带一个浏览器端小面板（`dsh.client` → `client.js`，注册
 | 面板区 | 作用 |
 |---|---|
 | 环境 | companion 路径（✓/✗）、`agy --version`、插件版本、配置文件路径 |
-| 委派配置 | 模式（`staffer`/`research`/`review`/`implement`/`ask`）、推理强度、模型覆盖、超时；两个开关分别管 `agy` 子智能体和 `/agy-*` 技能 |
+| 委派配置 | 模式（`staffer`/`research`/`review`/`implement`/`ask`）、推理强度（与模型 id 合成，不重复设置）、模型家族或自定义 id、单次委派超时 |
 | 连通性测试 | 跑一次 `ask` 并显示耗时 —— 「agy 到底通不通」按钮 |
 | 作业 | 从 `<cwd>/.agy-staff/state.json` 读最近作业，可**看结果**、可**取消** |
 

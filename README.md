@@ -100,7 +100,7 @@ The bundle ships a small panel in the browser client (`dsh.client` → `client.j
 | Panel section | What it does |
 |---|---|
 | 环境 | companion path (✓/✗), `agy --version`, plugin version, settings path |
-| 委派配置 | mode (`staffer`/`research`/`review`/`implement`/`ask`), reasoning effort, model override, timeout; two toggles for the `agy` subagent and the `/agy-*` skills |
+| 委派配置 | mode (`staffer`/`research`/`review`/`implement`/`ask`), effort composed into the model id, a model family or a raw id, and the per-delegation timeout |
 | 连通性测试 | one `ask` round trip with its wall time — the "is agy actually working" button |
 | 作业 | recent jobs from `<cwd>/.agy-staff/state.json`, with **结果** and **取消** |
 
