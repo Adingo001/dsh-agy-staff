@@ -1,6 +1,6 @@
 {
   "name": "dsh-agy-staff",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Hire Google's Antigravity CLI (agy) from DeepSeek Harness: seven /agy-* skills, an `agy` subagent provider, and a control panel to drive both.",
   "license": "MIT",
   "type": "module",

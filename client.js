@@ -199,7 +199,10 @@ window.__ModuleLoader__.load({
 .dsag-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .dsag-panel .dsag-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:12px;row-gap:10px;
   align-items:start}
-.dsag-panel .dsag-field{display:flex;flex-direction:column;gap:4px;min-width:0;margin:0;padding:0;border:0}
+.dsag-panel .dsag-field{display:flex;flex-direction:column;gap:4px;min-width:0;margin:0;padding:0;border:0}.dsag-field-model{margin-top:10px}
+.dsag-field-inline{flex-direction:row;align-items:center;gap:6px;flex:0 0 auto}
+.dsag-field-inline>span:first-child{font-size:11px;color:var(--dsw-alias-label-secondary,#475569);white-space:nowrap}
+.dsag-field-inline input{width:52px;text-align:center}
 .dsag-panel .dsag-field>span:first-child{display:block;height:16px;line-height:16px;margin:0;padding:0;
   font-size:11px;font-weight:500;color:var(--dsw-alias-label-secondary,#475569);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -698,7 +701,7 @@ window.__ModuleLoader__.load({
 				h("div", { className: "dsag-head" },
 					h("div", { className: dotClass, title: healthTitle }),
 					h("div", { className: "dsag-title" }, "agy"),
-					h("span", { className: "dsag-chip", title: healthTitle },
+					h("span", { className: "dsag-chip", title: "插件版本 " + (status && status.pluginVersion ? status.pluginVersion : "?") },
 						status !== null && status.pluginVersion !== undefined ? "v" + status.pluginVersion : "…"),
 					h("div", { className: "dsag-head-acts" },
 						h("button", {
@@ -780,14 +783,6 @@ window.__ModuleLoader__.load({
 												onChange: (e) => setDraft(Object.assign({}, draft, { mode: e.target.value })),
 											}, (status && status.modes ? status.modes : ["staffer"]).map((m) =>
 												h("option", { key: m, value: m }, m))))),
-									h("label", { className: "dsag-field" },
-										h("span", null, "模型"),
-										h("input", {
-											value: draft.model,
-											placeholder: "留空按模式默认",
-											list: "dsag-model-list",
-											onChange: (e) => setDraft(Object.assign({}, draft, { model: e.target.value })),
-										})),
 									h("div", { className: "dsag-field" },
 										h("span", null, "推理强度"),
 										h("div", { className: "dsag-seg", role: "group", "aria-label": "推理强度" },
@@ -802,16 +797,15 @@ window.__ModuleLoader__.load({
 													onClick: () => setDraft(Object.assign({}, draft, { effort: active ? "" : level })),
 												}, level);
 											}))),
-									h("label", { className: "dsag-field" },
-										h("span", null, "超时（分钟）"),
-										h("input", {
-											type: "number",
-											min: 1,
-											max: 120,
-											value: draft.timeoutMin,
-											onChange: (e) => setDraft(Object.assign({}, draft, { timeoutMin: e.target.value })),
-										})),
 								),
+								h("label", { className: "dsag-field dsag-field-model" },
+									h("span", null, "模型"),
+									h("input", {
+										value: draft.model,
+										placeholder: "留空按模式默认（可从下拉里挑，如 gemini-4-argon-high）",
+										list: "dsag-model-list",
+										onChange: (e) => setDraft(Object.assign({}, draft, { model: e.target.value })),
+									})),
 								h("div", { className: "dsag-toggle-bar" },
 									h("label", { className: "dsag-toggle" },
 										h("input", {
@@ -829,6 +823,17 @@ window.__ModuleLoader__.load({
 											onChange: (e) => setDraft(Object.assign({}, draft, { skillsEnabled: e.target.checked })),
 										}),
 										h("span", null, "/agy-* 技能")),
+									h("label", { className: "dsag-field dsag-field-inline" },
+										h("span", null, "超时"),
+										h("input", {
+											type: "number",
+											min: 1,
+											max: 120,
+											"aria-label": "超时（分钟）",
+											value: draft.timeoutMin,
+											onChange: (e) => setDraft(Object.assign({}, draft, { timeoutMin: e.target.value })),
+										}),
+										h("span", { className: "dsag-hint" }, "分")),
 									h("div", { className: "dsag-spacer" }),
 									notice !== "" ? h("span", { className: "dsag-notice", title: notice }, notice) : null,
 									h("button", {
@@ -962,7 +967,7 @@ window.__ModuleLoader__.load({
 
 				h("div", { className: "dsag-foot" },
 					h("div", { className: "dsag-foot-left" },
-						h("span", { className: "dsag-mono dsag-foot-ver", title: healthTitle }, healthSummary),
+						h("span", { className: "dsag-mono dsag-foot-ver", title: healthTitle }, "agy CLI " + healthSummary.replace(/^agy /, "")),
 					),
 				),
 			);
