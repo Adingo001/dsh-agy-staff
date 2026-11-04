@@ -221,9 +221,9 @@ window.__ModuleLoader__.load({
 .dsag-panel .dsag-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:12px;row-gap:10px;
   align-items:start}
 .dsag-panel .dsag-field{display:flex;flex-direction:column;gap:4px;min-width:0;margin:0;padding:0;border:0}.dsag-field-model{margin-top:10px}
-.dsag-field-inline{flex-direction:row;align-items:center;gap:6px;flex:0 0 auto}
-.dsag-field-inline>span:first-child{font-size:11px;color:var(--dsw-alias-label-secondary,#475569);white-space:nowrap}
-.dsag-field-inline input{width:52px;text-align:center}
+.dsag-panel .dsag-field-inline{flex-direction:row;align-items:center;gap:6px;flex:0 0 auto}
+.dsag-panel .dsag-field-inline>span:first-child{font-size:11px;color:var(--dsw-alias-label-secondary,#475569);white-space:nowrap}
+.dsag-panel .dsag-field-inline input{width:52px;text-align:center}
 .dsag-panel .dsag-field>span:first-child{display:block;height:16px;line-height:16px;margin:0;padding:0;
   font-size:11px;font-weight:500;color:var(--dsw-alias-label-secondary,#475569);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
