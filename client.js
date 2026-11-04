@@ -964,32 +964,43 @@ window.__ModuleLoader__.load({
 		 * sibling or carry a bigger z-index. Owning a host that is re-appended to the
 		 * end of <body> and stacking at the maximum index removes both races.
 		 */
-		function panelHost() {
+		/**
+		 * The panel's own layer. Created once and never moved during render: mutating
+		 * the DOM from a render body (plus a repeating re-append) is what froze the
+		 * page. Effects may append it, render bodies may only read it.
+		 */
+		function ensurePanelHost() {
 			if (typeof document === "undefined") return null;
 			let host = document.getElementById("dsag-host");
 			if (host === null) {
 				host = document.createElement("div");
 				host.id = "dsag-host";
 				host.className = "dsag-host";
+				document.body.appendChild(host);
 			}
-			// appendChild moves an existing node to the end: last sibling wins ties.
-			document.body.appendChild(host);
 			return host;
 		}
 
-		/** Keep the panel layer last while it is open: a hover toolbar can be re-added later. */
-		function useKeepLast(host, active) {
-			useEffect(() => {
-				if (!active || host === null) return undefined;
-				const tick = () => {
-					if (typeof document !== "undefined" && document.body.lastElementChild !== host) {
-						document.body.appendChild(host);
-					}
-				};
-				tick();
-				const interval = setInterval(tick, 800);
-				return () => clearInterval(interval);
-			}, [host, active]);
+		/** Render never crashes the host UI: a throwing panel renders nothing. */
+		class PanelBoundary extends react.Component {
+			constructor(props) {
+				super(props);
+				this.state = { failed: false };
+			}
+
+			static getDerivedStateFromError() {
+				return { failed: true };
+			}
+
+			componentDidCatch(error) {
+				console.warn("[dsh-agy-staff] panel render failed:", error);
+				void api("panel-alive", { version: "render-error:" + String(error) }).catch(() => {});
+			}
+
+			render() {
+				if (this.state.failed) return null;
+				return this.props.children;
+			}
 		}
 
 		function AgyOverlay() {
@@ -1039,6 +1050,19 @@ window.__ModuleLoader__.load({
 				return () => window.removeEventListener("keydown", onKey);
 			}, [open]);
 
+			// The layer handle is state, filled by an effect after commit. Rendering must
+			// never touch the DOM: doing that inside the render body is what hung the page.
+			const [layer, setLayer] = useState(null);
+			useEffect(() => {
+				if (!open) return;
+				const hostLayer = ensurePanelHost();
+				if (hostLayer !== null) {
+					// Post-commit move: last sibling wins a stacking tie with a hover toolbar.
+					document.body.appendChild(hostLayer);
+					setLayer(hostLayer);
+				}
+			}, [open]);
+
 			const portal = reactDom !== undefined && typeof reactDom.createPortal === "function"
 				? reactDom.createPortal
 				: null;
@@ -1049,8 +1073,6 @@ window.__ModuleLoader__.load({
 
 			// No strip (welcome screen) means no tab row to join: fall back to a small
 			// pill instead of letting a tab-styled button flow into <body>.
-			const panelLayer = open ? panelHost() : null;
-			useKeepLast(panelLayer, open);
 			const target = host !== null ? host : document.body;
 			const entry = host !== null ? tab : h("div", { className: "dsag-fallback" }, tab);
 			const panelStyle = anchor === null
@@ -1059,8 +1081,8 @@ window.__ModuleLoader__.load({
 
 			return h(react.Fragment, null,
 				portal(entry, target),
-				open
-					? portal(h("div", { style: panelStyle }, h(AgyPanel, { onClose: close })), (panelLayer ?? document.body))
+				open && layer !== null
+					? portal(h("div", { style: panelStyle }, h(PanelBoundary, null, h(AgyPanel, { onClose: close }))), layer)
 					: null,
 			);
 		}

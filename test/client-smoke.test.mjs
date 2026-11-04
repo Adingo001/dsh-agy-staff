@@ -15,7 +15,20 @@ function makeReact(seed = []) {
     let hookIndex = 0;
     const queue = [...seed];
     const next = () => (hookIndex < queue.length ? queue[hookIndex++] : undefined);
+    /** React.Component exists only so the error boundary can extend something. */
+    class Component {
+        constructor(props) {
+            this.props = props ?? {};
+            this.state = {};
+        }
+
+        setState(next) {
+            this.state = Object.assign({}, this.state, next);
+        }
+    }
+
     return {
+        Component,
         createElement: (type, props, ...children) => ({
             type,
             props: Object.assign({}, props ?? {}, { children: children.length <= 1 ? children[0] : children }),
