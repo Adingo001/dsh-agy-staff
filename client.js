@@ -22,6 +22,27 @@ window.__ModuleLoader__.load({
 		const STYLE_ID = "dsag-style";
 		const PANEL_WIDTH = 440;
 
+		/**
+		 * `agy models` ids carry the effort in their suffix (`gemini-4-argon-high`).
+		 * That is why the panel offers a family plus an effort instead of asking for
+		 * both as separate settings: two controls owning the same fact silently
+		 * conflicted, and the model choice always won.
+		 */
+		function splitModelId(id) {
+			const matched = /^(.*)-(low|medium|high)$/.exec(String(id || ""));
+			return matched === null ? { family: "", effort: "" } : { family: matched[1], effort: matched[2] };
+		}
+
+		/** Distinct model families from the catalog: `gemini-4-argon`, `claude-opus-5-5`, … */
+		function modelFamilies(catalog) {
+			const families = [];
+			for (const model of catalog) {
+				const family = splitModelId(model.id).family;
+				if (family !== "" && families.indexOf(family) === -1) families.push(family);
+			}
+			return families.sort();
+		}
+
 		/** Snapshot of `agy models`; the host op replaces it with the live catalog. */
 		const FALLBACK_MODELS = [
 			{ id: "gemini-4-argon-high", label: "Gemini 4 Argon (High)" },
@@ -247,6 +268,8 @@ window.__ModuleLoader__.load({
   color:var(--dsw-alias-label-secondary,#475569);
   display:inline-flex;align-items:center;justify-content:center;white-space:nowrap}
 .dsag-panel .dsag-seg-btn+.dsag-seg-btn{border-left:1px solid var(--dsw-alias-border-l2,rgba(15,23,42,.12))}
+.dsag-seg-off{opacity:.45}
+.dsag-seg-off .dsag-seg-btn{cursor:not-allowed}
 .dsag-panel .dsag-seg-btn:hover{color:var(--dsw-alias-label-primary,#0f172a);
   background:var(--dsw-alias-interactive-bg-hover,rgba(15,23,42,.05))}
 .dsag-panel .dsag-seg-btn.on{background:var(--dsw-alias-button-primary-fill,var(--dsw-alias-brand-primary,#4f46e5));
@@ -476,6 +499,8 @@ window.__ModuleLoader__.load({
 			const [cwd, setCwd] = useState("");
 			const [models, setModels] = useState(FALLBACK_MODELS);
 			const [menuOpen, setMenuOpen] = useState(false);
+			/** `auto` = mode default, `family` = family + effort, `custom` = a raw id. */
+			const [modelMode, setModelMode] = useState("auto");
 			const [newerAvailable, setNewerAvailable] = useState(false);
 			const [updateInfo, setUpdateInfo] = useState(null);
 			const [updateOpen, setUpdateOpen] = useState(true);
@@ -488,6 +513,10 @@ window.__ModuleLoader__.load({
 					const info = await api("status");
 					if (!info.ok) throw new Error(info.error || "status failed");
 					setStatus(info);
+					const splitDefault = splitModelId(info.defaults.model);
+					setModelMode(info.defaults.model === ""
+						? "auto"
+						: splitDefault.family === "" ? "custom" : "family");
 					setDraft({
 						mode: info.defaults.mode,
 						model: info.defaults.model,
@@ -695,6 +724,7 @@ window.__ModuleLoader__.load({
 				? healthSummary
 				: healthSummary + "\n" + status.companion + "\n" + status.settingsPath;
 			const efforts = status && status.efforts ? status.efforts : ["low", "medium", "high"];
+			const families = modelFamilies(models);
 			const cliIssue = status !== null && (!healthy || !status.companionExists) ? healthSummary : "";
 
 			return h("div", { className: "dsag-panel", role: "dialog", "aria-label": "agy" },
@@ -785,27 +815,78 @@ window.__ModuleLoader__.load({
 												h("option", { key: m, value: m }, m))))),
 									h("div", { className: "dsag-field" },
 										h("span", null, "推理强度"),
-										h("div", { className: "dsag-seg", role: "group", "aria-label": "推理强度" },
+										h("div", {
+											className: modelMode === "custom" ? "dsag-seg dsag-seg-off" : "dsag-seg",
+											role: "group",
+											"aria-label": "推理强度",
+										},
 											efforts.map((level) => {
 												const active = draft.effort === level;
+												const disabled = modelMode === "custom";
 												return h("button", {
 													key: level,
 													type: "button",
 													className: active ? "dsag-seg-btn on" : "dsag-seg-btn",
 													"aria-pressed": active ? "true" : "false",
-													title: active ? "再次点击恢复默认" : "设为 " + level,
-													onClick: () => setDraft(Object.assign({}, draft, { effort: active ? "" : level })),
+													disabled: disabled,
+													title: disabled
+														? "自定义模型 id 已自带推理强度"
+														: active ? "再次点击恢复默认" : "设为 " + level,
+													onClick: () => {
+														if (disabled) return;
+														if (active) {
+															setModelMode("auto");
+															setDraft(Object.assign({}, draft, { effort: "", model: "" }));
+															return;
+														}
+														const family = splitModelId(draft.model).family;
+														setDraft(Object.assign({}, draft, {
+															effort: level,
+															model: family === "" ? "" : family + "-" + level,
+														}));
+													},
 												}, level);
 											}))),
 								),
 								h("label", { className: "dsag-field dsag-field-model" },
 									h("span", null, "模型"),
-									h("input", {
-										value: draft.model,
-										placeholder: "留空按模式默认（可从下拉里挑，如 gemini-4-argon-high）",
-										list: "dsag-model-list",
-										onChange: (e) => setDraft(Object.assign({}, draft, { model: e.target.value })),
-									})),
+									h("span", { className: "dsag-select-wrap" },
+										h("select", {
+											value: modelMode === "custom" ? "__custom__" : modelMode === "family" ? splitModelId(draft.model).family : "",
+											onChange: (e) => {
+												const value = e.target.value;
+												if (value === "") {
+													setModelMode("auto");
+													setDraft(Object.assign({}, draft, { model: "" }));
+													return;
+												}
+												if (value === "__custom__") {
+													setModelMode("custom");
+													return;
+												}
+												const effort = splitModelId(draft.model).effort || draft.effort || "medium";
+												setModelMode("family");
+												setDraft(Object.assign({}, draft, { model: value + "-" + effort, effort: effort }));
+											},
+										},
+											h("option", { key: "", value: "" },
+												"按模式默认" + (draft.effort === "" ? "" : "（推理 " + draft.effort + "）")),
+											families.map((family) => h("option", { key: family, value: family }, family)),
+											h("option", { key: "__custom__", value: "__custom__" }, "自定义 id…"))),
+									modelMode === "custom"
+										? h("input", {
+											value: draft.model,
+											placeholder: "如 gemini-4-argon-high（必须带 -low/-medium/-high）",
+											list: "dsag-model-list",
+											onChange: (e) => setDraft(Object.assign({}, draft, { model: e.target.value })),
+										})
+										: null,
+									h("div", { className: "dsag-hint" },
+										modelMode === "custom"
+											? "id 自带强度，右侧「推理强度」不叠加"
+											: modelMode === "family"
+												? "将使用 " + draft.model
+												: "由模式决定，强度已写在 id 里")),
 								h("div", { className: "dsag-toggle-bar" },
 									h("label", { className: "dsag-toggle" },
 										h("input", {
