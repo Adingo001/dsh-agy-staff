@@ -22,6 +22,19 @@ window.__ModuleLoader__.load({
 		const STYLE_ID = "dsag-style";
 		const PANEL_WIDTH = 440;
 
+		/** Snapshot of `agy models`; the host op replaces it with the live catalog. */
+		const FALLBACK_MODELS = [
+			{ id: "gemini-4-argon-high", label: "Gemini 4 Argon (High)" },
+			{ id: "gemini-4-argon-medium", label: "Gemini 4 Argon (Medium)" },
+			{ id: "gemini-4-argon-low", label: "Gemini 4 Argon (Low)" },
+			{ id: "gemini-3.8-flash-high", label: "Gemini 3.8 Flash (High)" },
+			{ id: "gemini-3.8-flash-medium", label: "Gemini 3.8 Flash (Medium)" },
+			{ id: "gemini-3.8-flash-low", label: "Gemini 3.8 Flash (Low)" },
+			{ id: "claude-opus-5-5-high", label: "Claude Opus 5.5 (High)" },
+			{ id: "claude-sonnet-5-5-high", label: "Claude Sonnet 5.5 (High)" },
+			{ id: "gpt-oss-120b-medium", label: "GPT-OSS 120B (Medium)" },
+		];
+
 		/**
 		 * HMR swaps this module without unmounting the previous React tree, so the
 		 * old entry keeps its (now stale) registration and DOM. Counting loads lets
@@ -379,6 +392,17 @@ window.__ModuleLoader__.load({
 .dsag-update-meta.err{color:var(--dsw-alias-state-error-primary,#e11d48)}
 .dsag-out.dsag-foot-out{max-height:160px}
 
+.dsag-menu-wrap{position:relative;display:inline-flex}
+.dsag-icon-btn.on{color:var(--dsw-alias-label-primary,#0f172a);background:var(--dsw-alias-interactive-bg-hover,rgba(15,23,42,.06))}
+.dsag-menu{position:absolute;right:0;top:calc(100% + 4px);min-width:136px;padding:4px;z-index:3;
+  display:flex;flex-direction:column;border-radius:8px;
+  background:var(--dsw-alias-bg-layer-2,#fff);border:1px solid var(--dsw-alias-border-l2,rgba(15,23,42,.12));
+  box-shadow:0 8px 20px rgba(15,23,42,.14)}
+.dsag-menu-item{appearance:none;border:0;background:transparent;text-align:left;cursor:pointer;
+  padding:6px 8px;border-radius:6px;font:500 12px/16px inherit;color:var(--dsw-alias-label-primary,inherit)}
+.dsag-menu-item:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(15,23,42,.06))}
+.dsag-menu-item:disabled{opacity:.5;cursor:default}
+
 .dsag-foot{padding:6px 16px;border-top:1px solid var(--dsw-alias-border-l1,rgba(15,23,42,.08));
   background:var(--dsw-alias-bg-layer-1,#f8fafc);display:flex;align-items:baseline;justify-content:space-between;
   gap:8px;font-size:11px;font-variant-numeric:tabular-nums;
@@ -447,6 +471,8 @@ window.__ModuleLoader__.load({
 			const [jobs, setJobs] = useState([]);
 			const [jobOut, setJobOut] = useState(null);
 			const [cwd, setCwd] = useState("");
+			const [models, setModels] = useState(FALLBACK_MODELS);
+			const [menuOpen, setMenuOpen] = useState(false);
 			const [newerAvailable, setNewerAvailable] = useState(false);
 			const [updateInfo, setUpdateInfo] = useState(null);
 			const [updateOpen, setUpdateOpen] = useState(true);
@@ -475,6 +501,15 @@ window.__ModuleLoader__.load({
 					setBusy("");
 				}
 			}, [cwd]);
+
+			useEffect(() => {
+				// The CLI owns the catalog; the embedded list is only a placeholder.
+				api("models")
+					.then((res) => {
+						if (res.ok && Array.isArray(res.models) && res.models.length > 0) setModels(res.models);
+					})
+					.catch(() => {});
+			}, []);
 
 			useEffect(() => {
 				// Report the open panel's own layering: a covered region shows up as
@@ -647,33 +682,6 @@ window.__ModuleLoader__.load({
 				}
 			}, []);
 
-			const digUpdate = useCallback(async () => {
-				setBusy("update-dig");
-				try {
-					const res = await api("update-dig", { cwd: cwd || undefined });
-					if (!res.ok && typeof res.error === "string" && res.error.indexOf("unknown op") !== -1) {
-						setUpdateInfo({ meta: "重启应用后可用", output: "", tone: "" });
-						setUpdateOpen(false);
-					} else if (res.ok) {
-						const out = String(res.output || "");
-						const matched = /job id:\s*([^\s(]+)/i.exec(out);
-						const jobRef = matched !== null ? matched[1] : (out.split(/\r?\n/)[0] || "").trim();
-						setUpdateInfo({ meta: "已派 job：" + (jobRef || "staffer"), output: out, tone: "brand" });
-						setUpdateOpen(Boolean(out));
-						const list = await api("jobs", { cwd: cwd || undefined });
-						if (list.ok) setJobs(list.jobs);
-					} else {
-						setUpdateInfo({ meta: res.error || "派发失败", output: res.output || "", tone: "err" });
-						setUpdateOpen(Boolean(res.output));
-					}
-				} catch (e) {
-					setUpdateInfo({ meta: String((e && e.message) || e), output: "", tone: "err" });
-					setUpdateOpen(false);
-				} finally {
-					setBusy("");
-				}
-			}, [cwd]);
-
 			const healthy = status !== null && status.agy !== undefined && status.agy.ok;
 			const statusOk = status !== null && status.ok === true;
 			const dotClass = status === null ? "dsag-dot" : healthy ? "dsag-dot ok" : "dsag-dot bad";
@@ -701,6 +709,44 @@ window.__ModuleLoader__.load({
 							disabled: busy !== "",
 							onClick: () => void load(),
 						}, h(RefreshIcon, { spinning: busy === "load" })),
+						statusOk
+							? h("span", { className: "dsag-menu-wrap" },
+								h("button", {
+									type: "button",
+									className: menuOpen ? "dsag-btn dsag-btn-ghost dsag-icon-btn on" : "dsag-btn dsag-btn-ghost dsag-icon-btn",
+									title: "更多",
+									"aria-label": "更多",
+									"aria-expanded": menuOpen ? "true" : "false",
+									onClick: () => setMenuOpen((prev) => !prev),
+								}, "⋯"),
+								menuOpen
+									? h("div", { className: "dsag-menu", role: "menu" },
+										h("button", {
+											type: "button",
+											className: "dsag-menu-item",
+											role: "menuitem",
+											disabled: busy !== "",
+											onClick: () => {
+												setMenuOpen(false);
+												void checkUpdate();
+											},
+										}, "检查更新"),
+										newerAvailable === true
+											? h("button", {
+												type: "button",
+												className: "dsag-menu-item",
+												role: "menuitem",
+												disabled: busy !== "",
+												onClick: () => {
+													setMenuOpen(false);
+													void applyUpdate();
+												},
+											}, busy === "update-apply" ? "升级中…" : "升级 agy")
+											: null,
+									)
+									: null,
+							)
+							: null,
 						h("button", {
 							type: "button",
 							className: "dsag-x",
@@ -739,6 +785,7 @@ window.__ModuleLoader__.load({
 										h("input", {
 											value: draft.model,
 											placeholder: "留空按模式默认",
+											list: "dsag-model-list",
 											onChange: (e) => setDraft(Object.assign({}, draft, { model: e.target.value })),
 										})),
 									h("div", { className: "dsag-field" },
@@ -910,35 +957,13 @@ window.__ModuleLoader__.load({
 					)
 					: null,
 
+				h("datalist", { id: "dsag-model-list" },
+					models.map((model) => h("option", { key: model.id, value: model.id }, model.label))),
+
 				h("div", { className: "dsag-foot" },
 					h("div", { className: "dsag-foot-left" },
 						h("span", { className: "dsag-mono dsag-foot-ver", title: healthTitle }, healthSummary),
-						statusOk
-							? h(react.Fragment, null,
-								h("button", {
-									type: "button",
-									className: "dsag-btn dsag-btn-ghost dsag-foot-btn",
-									disabled: busy !== "",
-									onClick: () => void checkUpdate(),
-								}, "检查更新"),
-								newerAvailable === true
-									? h("button", {
-										type: "button",
-										className: "dsag-btn dsag-btn-ghost dsag-foot-btn dsag-foot-upgrade",
-										disabled: busy !== "",
-										onClick: () => void applyUpdate(),
-									}, busy === "update-apply" ? "升级中…" : "升级")
-									: null,
-								h("button", {
-									type: "button",
-									className: "dsag-btn dsag-btn-ghost dsag-foot-btn",
-									disabled: busy !== "",
-									onClick: () => void digUpdate(),
-								}, "用 agy 读更新"),
-							)
-							: null,
 					),
-	
 				),
 			);
 		}

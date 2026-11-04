@@ -229,6 +229,21 @@ export async function dispatch(request, context = {}) {
                     output: (result.stdout || result.stderr).trim().slice(-8000),
                 };
             }
+            case 'models': {
+                // gy models prints id<TAB>Display Name after a "Fetching…" line.
+                const listed = await run('agy', ['models'], { timeoutMs: 90_000 });
+                const text = (listed.stdout || '').trim();
+                const models = [];
+                for (const line of text.split(/\r?\n/)) {
+                    const pair = /^(\S+)\t+(.+)$/.exec(line.trim());
+                    if (pair !== null) models.push({ id: pair[1], label: pair[2].trim() });
+                }
+                return {
+                    ok: listed.code === 0 && models.length > 0,
+                    models,
+                    output: models.length === 0 ? (listed.stderr || text).slice(-4000) : undefined,
+                };
+            }
             case 'update-dig': {
                 // "let the model fetch it": dispatch an agy staffer job that reads the
                 // changelog and reports what is new, without touching the installation.
