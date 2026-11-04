@@ -277,22 +277,6 @@ window.__ModuleLoader__.load({
 
 .dsag-panel .dsag-toggle-bar{display:flex;align-items:center;gap:14px;min-height:28px;padding-top:10px;margin:0;
   border-top:1px solid var(--dsw-alias-border-l1,rgba(15,23,42,.07))}
-.dsag-panel .dsag-toggle{display:inline-flex;align-items:center;gap:6px;height:28px;margin:0;padding:0;
-  cursor:pointer;user-select:none;font-size:12px;line-height:16px;
-  color:var(--dsw-alias-label-secondary,#475569);white-space:nowrap;flex:0 0 auto}
-.dsag-panel .dsag-toggle>span{display:inline-block;line-height:16px;margin:0;padding:0}
-.dsag-panel input[type="checkbox"].dsag-switch{appearance:none;-webkit-appearance:none;box-sizing:border-box;
-  position:relative;display:inline-block;vertical-align:middle;width:28px;height:16px;min-height:16px;max-height:16px;
-  margin:0;padding:0;border-radius:999px;cursor:pointer;flex:0 0 28px;
-  background:var(--dsw-alias-bg-layer-3,#cbd5e1);
-  border:1px solid var(--dsw-alias-border-l2,rgba(15,23,42,.14));transition:background .14s ease,border-color .14s ease}
-.dsag-panel input[type="checkbox"].dsag-switch:after{content:"";position:absolute;top:1px;left:1px;width:12px;height:12px;
-  border-radius:999px;background:var(--dsw-alias-bg-layer-2,#ffffff);box-shadow:0 1px 2px rgba(0,0,0,.18);
-  transition:transform .14s ease}
-.dsag-panel input[type="checkbox"].dsag-switch:checked{
-  background:var(--dsw-alias-button-primary-fill,var(--dsw-alias-brand-primary,#4f46e5));
-  border-color:var(--dsw-alias-button-primary-fill,var(--dsw-alias-brand-primary,#4f46e5))}
-.dsag-panel input[type="checkbox"].dsag-switch:checked:after{transform:translateX(12px);
   background:var(--dsw-alias-label-primary-inverted,#ffffff)}
 .dsag-notice{font-size:11px;line-height:16px;color:var(--dsw-alias-state-success-primary,#10b981);
   min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -522,8 +506,6 @@ window.__ModuleLoader__.load({
 						model: info.defaults.model,
 						effort: info.defaults.effort,
 						timeoutMin: Math.round(info.defaults.timeoutMs / 60000),
-						subagentEnabled: info.defaults.subagentEnabled,
-						skillsEnabled: info.defaults.skillsEnabled,
 					});
 					const list = await api("jobs", { cwd: cwd || undefined });
 					if (list.ok) setJobs(list.jobs);
@@ -588,8 +570,6 @@ window.__ModuleLoader__.load({
 							model: draft.model,
 							effort: draft.effort,
 							timeoutMs: Math.max(30000, Math.round(Number(draft.timeoutMin) * 60000)),
-							subagentEnabled: draft.subagentEnabled,
-							skillsEnabled: draft.skillsEnabled,
 						},
 					});
 					if (!result.ok) throw new Error(result.error || "save failed");
@@ -888,22 +868,6 @@ window.__ModuleLoader__.load({
 												? "将使用 " + draft.model
 												: "由模式决定，强度已写在 id 里")),
 								h("div", { className: "dsag-toggle-bar" },
-									h("label", { className: "dsag-toggle" },
-										h("input", {
-											type: "checkbox",
-											className: "dsag-switch",
-											checked: draft.subagentEnabled,
-											onChange: (e) => setDraft(Object.assign({}, draft, { subagentEnabled: e.target.checked })),
-										}),
-										h("span", null, "agy 子智能体")),
-									h("label", { className: "dsag-toggle" },
-										h("input", {
-											type: "checkbox",
-											className: "dsag-switch",
-											checked: draft.skillsEnabled,
-											onChange: (e) => setDraft(Object.assign({}, draft, { skillsEnabled: e.target.checked })),
-										}),
-										h("span", null, "/agy-* 技能")),
 									h("label", { className: "dsag-field dsag-field-inline" },
 										h("span", null, "超时"),
 										h("input", {
