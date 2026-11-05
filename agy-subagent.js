@@ -29,8 +29,9 @@ import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
-import { admit } from './agy-admission.js';
+import { admit, remedyFor } from './agy-admission.js';
 import { record } from './agy-ledger.js';
+import { readModelCache } from './agy-models.js';
 import { readSettings, settingsVersion } from './agy-settings.js';
 
 /** Registered provider name; the `dsh-tool-subagent` row must select this. */
@@ -171,14 +172,25 @@ export class AgySubagentProvider {
             if (code === 'subagent_disabled') return 'agy subagent is disabled in the agy control panel';
             if (code === 'prompt_too_long') return `the task text is too long for one delegation`;
             if (code === 'mode_unknown') return 'the configured companion mode is not one this bundle knows';
+            if (code === 'model_unknown') return 'the configured model id is not in the catalog the panel listed';
             if (code === 'secret_in_prompt') return 'the task text looks like it carries a credential';
             return 'the delegation budget of concurrent runs is used up';
         };
 
+        // Written by the panel's last `agy models` listing. Empty means "never listed",
+        // which admission reads as "no opinion" rather than "refuse everything".
+        const modelCatalog = readModelCache();
+
         const result = (async () => {
             const verdict = admit(
                 { prompt, inFlight: this.running.size - 1 },
-                { subagentEnabled: config.enabled, mode: config.mode, maxConcurrent: config.maxConcurrent },
+                {
+                    subagentEnabled: config.enabled,
+                    mode: config.mode,
+                    model: config.model,
+                    modelCatalog,
+                    maxConcurrent: config.maxConcurrent,
+                },
             );
             if (!verdict.admissible) {
                 record(ledgerCwd, {
@@ -190,7 +202,10 @@ export class AgySubagentProvider {
                 });
                 return {
                     output: '',
-                    diagnostic: `AGY_REFUSED ${verdict.reason.code}: ${refusalDetail(verdict.reason.code)}`,
+                    diagnostic: [
+                        `AGY_REFUSED ${verdict.reason.code}: ${refusalDetail(verdict.reason.code)}`,
+                        remedyFor(verdict.reason.code) === undefined ? '' : `next: ${remedyFor(verdict.reason.code)}`,
+                    ].filter(Boolean).join(' | '),
                     stopReason: 'error',
                 };
             }

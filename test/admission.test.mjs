@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { admit, MAX_PROMPT_CHARS, REASON_CODES, scanSecrets } from '../agy-admission.js';
+import { admit, MAX_PROMPT_CHARS, REASON_CODES, remedyFor, scanSecrets } from '../agy-admission.js';
 
 /** A settings object that passes every non-prompt rule. */
 const ok = { subagentEnabled: true, mode: 'staffer', maxConcurrent: 0 };
@@ -10,8 +10,33 @@ const asked = (prompt, settings = ok, extra = {}) => admit({ prompt, ...extra },
 test('exposes one stable code per refusal branch', () => {
     assert.deepEqual(
         [...REASON_CODES],
-        ['empty_prompt', 'prompt_too_long', 'subagent_disabled', 'mode_unknown', 'secret_in_prompt', 'concurrency_exhausted'],
+        ['empty_prompt', 'prompt_too_long', 'subagent_disabled', 'mode_unknown', 'model_unknown', 'secret_in_prompt', 'concurrency_exhausted'],
     );
+});
+
+test('every code ships a remedy the caller can act on', () => {
+    for (const code of REASON_CODES) {
+        const remedy = remedyFor(code);
+        assert.equal(typeof remedy, 'string', code);
+        assert.ok(remedy.length > 10, code);
+    }
+    assert.equal(remedyFor('not-a-code'), undefined);
+});
+
+test('model_unknown only fires against a populated catalog', () => {
+    const catalog = ['gemini-4-argon-high', 'gemini-4-argon-medium'];
+
+    assert.equal(admit({ prompt: 'go' }, { ...ok, model: '', modelCatalog: catalog }).admissible, true);
+    assert.equal(admit({ prompt: 'go' }, { ...ok, model: 'gemini-4-argon-high', modelCatalog: catalog }).admissible, true);
+
+    const verdict = admit({ prompt: 'go' }, { ...ok, model: 'gpt-oss-120b-low', modelCatalog: catalog });
+    assert.equal(verdict.admissible, false);
+    assert.equal(verdict.reason.code, 'model_unknown');
+    assert.deepEqual(verdict.reason.values, { model: 'gpt-oss-120b-low', known: 2 });
+
+    // An empty catalog means "never listed", which must not refuse real work.
+    assert.equal(admit({ prompt: 'go' }, { ...ok, model: 'gpt-oss-120b-low', modelCatalog: [] }).admissible, true);
+    assert.equal(admit({ prompt: 'go' }, { ...ok, model: 'gpt-oss-120b-low' }).admissible, true);
 });
 
 test('empty_prompt covers blank and non-string prompts', () => {

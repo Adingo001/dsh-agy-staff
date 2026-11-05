@@ -22,6 +22,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { readDecisions } from './agy-ledger.js';
+import { writeModelCache } from './agy-models.js';
 import { EFFORTS, MODES, dshHome, readSettings, settingsPath, writeSettings } from './agy-settings.js';
 
 export const name = 'agy-staff-ui';
@@ -239,6 +240,9 @@ export async function dispatch(request, context = {}) {
                     const pair = /^(\S+)\t+(.+)$/.exec(line.trim());
                     if (pair !== null) models.push({ id: pair[1], label: pair[2].trim() });
                 }
+                // Persist the listing: admission reads it as the model allowlist, and a
+                // delegation must not have to wait on this network call to be judged.
+                if (models.length > 0) writeModelCache(models);
                 return {
                     ok: listed.code === 0 && models.length > 0,
                     models,

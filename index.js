@@ -205,11 +205,26 @@ const name = 'dsh-agy-staff';
 const inject = ['skills'];
 
 /**
- * @param {{ skills: { registerProvider: (factory: () => unknown) => void }, inject: Function }} ctx
+ * `ctx.subagents.registerProvider()` owns its effect on the *service's* context, not
+ * on ours, so registering the same name twice throws `a subagent provider named
+ * "agy" is already registered` - and that failure takes the whole bundle row down
+ * with it. Rather than reason about when this module gets evaluated twice, register
+ * at most once per process.
+ *
+ * The same conclusion, reached independently, is documented in
+ * dsh-multitask/lib/worker-providers.js.
+ */
+let subagentRegistered = false;
+
+/**
+ * @param {{ skills: { registerProvider: (factory: () => unknown) => void },
+ *   inject: Function }} ctx
  */
 function apply(ctx) {
     ctx.skills.registerProvider(() => provider);
     ctx.inject(['subagents'], (subagentsCtx) => {
+        if (subagentRegistered) return;
+        subagentRegistered = true;
         subagentsCtx.subagents.registerProvider(createAgyProvider());
     });
 }

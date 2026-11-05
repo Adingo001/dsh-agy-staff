@@ -26,6 +26,7 @@ export const REASON_CODES = Object.freeze([
     'prompt_too_long',
     'subagent_disabled',
     'mode_unknown',
+    'model_unknown',
     'secret_in_prompt',
     'concurrency_exhausted',
 ]);
@@ -94,6 +95,32 @@ function refuse(code, values) {
 }
 
 /**
+ * What the caller should do instead, one sentence per code.
+ *
+ * Why it travels with the refusal: a code tells an agent it failed, not how to
+ * succeed. The provider appends this after the human sentence, so the fix arrives
+ * with the error instead of being looked up in documentation.
+ */
+export const REMEDIES = Object.freeze({
+    empty_prompt: 'include the task text in the prompt',
+    prompt_too_long: 'split the task into smaller briefs and delegate them one at a time',
+    subagent_disabled: 'enable the agy subagent in the panel, or call the /agy-* skill instead',
+    mode_unknown: 'pick a mode the companion supports (staffer/research/review/implement/ask)',
+    model_unknown: 'pick a model id listed by the agy panel, or leave the field empty to use the mode default',
+    secret_in_prompt: 'reference the variable name (for example $GITHUB_TOKEN) instead of pasting the value',
+    concurrency_exhausted: 'wait for a running delegation to finish, or raise maxConcurrent in the panel',
+});
+
+/**
+ * The next step for one code.
+ * @param {string} code
+ * @returns {string | undefined}
+ */
+export function remedyFor(code) {
+    return REMEDIES[code];
+}
+
+/**
  * Decide whether one delegation may proceed, in a fixed order so the first
  * failure is the one worth reporting.
  *
@@ -120,6 +147,13 @@ export function admit(request, settings) {
     const policy = settings === null || settings === undefined ? {} : settings;
     if (policy.subagentEnabled === false) {
         return refuse('subagent_disabled');
+    }
+    // A populated catalog is the allowlist; an empty one only means the panel has
+    // never listed models yet, which is not evidence that this id is wrong.
+    const catalog = Array.isArray(policy.modelCatalog) ? policy.modelCatalog : [];
+    const wantedModel = typeof policy.model === 'string' ? policy.model.trim() : '';
+    if (wantedModel !== '' && catalog.length > 0 && !catalog.includes(wantedModel)) {
+        return refuse('model_unknown', { model: wantedModel, known: catalog.length });
     }
     if (!MODES.includes(policy.mode)) {
         return refuse('mode_unknown', { mode: policy.mode === undefined ? '' : String(policy.mode) });
