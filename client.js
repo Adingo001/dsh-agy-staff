@@ -56,6 +56,84 @@ window.__ModuleLoader__.load({
 			{ id: "gpt-oss-120b-medium", label: "GPT-OSS 120B (Medium)" },
 		];
 
+		/** Local Chinese remedies for admission refusal codes; mirrors host REMEDIES. */
+		const REMEDY = {
+			empty_prompt: "请在委派提示词中填写具体任务内容。",
+			prompt_too_long: "将任务拆分为更小的说明，分批逐个委派。",
+			subagent_disabled: "在面板中启用 agy 子代理，或改用 /agy-* 技能。",
+			mode_unknown: "改为受支持的委派模式（staffer/research/review/implement/ask）。",
+			model_unknown: "改选面板目录中的模型 id，或留空以使用模式默认模型。",
+			secret_in_prompt: "改用环境变量名引用（如 $GITHUB_TOKEN），不要直接粘贴密钥值。",
+			concurrency_exhausted: "等待正在运行的委派结束，或在面板中调高并发上限。",
+		};
+
+		function hasModelId(catalog, id) {
+			if (!Array.isArray(catalog) || id === "") return false;
+			for (const entry of catalog) {
+				const entryId = typeof entry === "string" ? entry : entry && entry.id;
+				if (entryId === id) return true;
+			}
+			return false;
+		}
+
+		function parseMaxConcurrent(raw) {
+			if (typeof raw === "number") {
+				return Number.isInteger(raw) && raw >= 0 && raw <= 8 ? raw : null;
+			}
+			const trimmed = String(raw === undefined || raw === null ? "" : raw).trim();
+			if (!/^-?\d+$/.test(trimmed)) return null;
+			const n = Number(trimmed);
+			return Number.isInteger(n) && n >= 0 && n <= 8 ? n : null;
+		}
+
+		function decisionBadgeTone(kind) {
+			if (kind === "refused") return "danger";
+			if (kind === "spawned") return "success";
+			if (kind === "settings_drifted") return "warn";
+			return "neutral";
+		}
+
+		function decisionDetailPairs(entry) {
+			const pairs = [];
+			const mergedValues = Object.assign(
+				{},
+				entry && typeof entry.values === "object" && entry.values !== null ? entry.values : {},
+				entry && entry.reason && typeof entry.reason === "object" && typeof entry.reason.values === "object" && entry.reason.values !== null
+					? entry.reason.values
+					: {},
+			);
+			for (const key of Object.keys(mergedValues)) {
+				const val = mergedValues[key];
+				pairs.push([key, typeof val === "object" && val !== null ? JSON.stringify(val) : String(val)]);
+			}
+			if (entry && entry.settingsVersion !== undefined && entry.settingsVersion !== "") {
+				pairs.push(["settingsVersion", String(entry.settingsVersion)]);
+			}
+			if (entry && entry.jobId !== undefined && entry.jobId !== "") {
+				pairs.push(["jobId", String(entry.jobId)]);
+			}
+			return pairs;
+		}
+
+		function pad2(n) {
+			return n < 10 ? "0" + n : String(n);
+		}
+
+		function formatRelativeTime(iso, nowMs) {
+			const ts = Date.parse(String(iso || ""));
+			if (!Number.isFinite(ts)) return iso ? String(iso) : "—";
+			const diffSec = Math.max(0, Math.floor((nowMs - ts) / 1000));
+			if (diffSec < 60) return "刚刚";
+			if (diffSec < 3600) return Math.floor(diffSec / 60) + " 分钟前";
+			const now = new Date(nowMs);
+			const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+			const date = new Date(ts);
+			const hhmm = pad2(date.getHours()) + ":" + pad2(date.getMinutes());
+			if (ts >= todayStart) return Math.floor(diffSec / 3600) + " 小时前";
+			if (ts >= todayStart - 86400000) return "昨天 " + hhmm;
+			return pad2(date.getMonth() + 1) + "-" + pad2(date.getDate()) + " " + hhmm;
+		}
+
 		/**
 		 * HMR swaps this module without unmounting the previous React tree, so the
 		 * old entry keeps its (now stale) registration and DOM. Counting loads lets
@@ -371,7 +449,7 @@ window.__ModuleLoader__.load({
   border:1px solid var(--dsw-alias-border-l1,rgba(15,23,42,.14));
   color:var(--dsw-alias-label-secondary,#475569);
   background:var(--dsw-alias-bg-layer-1,#f8fafc)}
-.dsag-badge.done{color:var(--dsw-alias-state-success-primary,#0f7b52);
+.dsag-badge.done,.dsag-badge.success{color:var(--dsw-alias-state-success-primary,#0f7b52);
   border-color:rgba(16,185,129,.4);
   border-color:color-mix(in srgb,var(--dsw-alias-state-success-primary,#10b981) 38%,transparent);
   background:rgba(16,185,129,.1);
@@ -381,7 +459,7 @@ window.__ModuleLoader__.load({
   border-color:color-mix(in srgb,var(--dsw-alias-link,#0284c7) 38%,transparent);
   background:rgba(2,132,199,.08);
   background:color-mix(in srgb,var(--dsw-alias-link,#0284c7) 10%,transparent)}
-.dsag-badge.error,.dsag-badge.timeout{color:var(--dsw-alias-state-error-primary,#b91c1c);
+.dsag-badge.error,.dsag-badge.timeout,.dsag-badge.danger{color:var(--dsw-alias-state-error-primary,#b91c1c);
   border-color:rgba(225,29,72,.4);
   border-color:color-mix(in srgb,var(--dsw-alias-state-error-primary,#e11d48) 38%,transparent);
   background:rgba(225,29,72,.08);
@@ -391,6 +469,45 @@ window.__ModuleLoader__.load({
   border-color:color-mix(in srgb,var(--dsw-alias-state-warn-primary,#f59e0b) 38%,transparent);
   background:rgba(245,158,11,.08);
   background:color-mix(in srgb,var(--dsw-alias-state-warn-primary,#f59e0b) 10%,transparent)}
+.dsag-badge.dsag-badge-kind{width:auto;flex:0 0 auto;min-width:56px;padding:0 7px;white-space:nowrap}
+
+.dsag-panel .dsag-field-inline .dsag-hint{white-space:nowrap}
+.dsag-warn{font-size:11px;line-height:16px;color:var(--dsw-alias-state-warn-primary,#b45309)}
+.dsag-field-err{font-size:11px;line-height:16px;color:var(--dsw-alias-state-error-primary,#e11d48)}
+.dsag-panel input.dsag-input-err{border-color:var(--dsw-alias-state-error-primary,#e11d48)}
+
+.dsag-panel .dsag-decisions-head{display:flex;align-items:center;gap:8px;height:28px;min-height:28px;margin:0;padding:0}
+.dsag-panel .dsag-decisions-head .dsag-label{line-height:28px}
+.dsag-btn.dsag-filter-btn.on,.dsag-panel button.dsag-btn.dsag-filter-btn.on{
+  color:var(--dsw-alias-state-error-primary,#b91c1c);
+  border-color:rgba(225,29,72,.36);
+  border-color:color-mix(in srgb,var(--dsw-alias-state-error-primary,#e11d48) 36%,transparent);
+  background:rgba(225,29,72,.08);
+  background:color-mix(in srgb,var(--dsw-alias-state-error-primary,#e11d48) 10%,transparent)}
+.dsag-decisions{display:flex;flex-direction:column;gap:4px;max-height:220px;overflow:auto}
+.dsag-decision{border-radius:7px;border:1px solid transparent;border-left:2px solid transparent}
+.dsag-decision.dsag-decision-refused{border-left-color:var(--dsw-alias-state-error-primary,#e11d48)}
+.dsag-decision.open{border-color:var(--dsw-alias-border-l1,rgba(15,23,42,.1));
+  background:var(--dsw-alias-bg-layer-1,#f8fafc)}
+.dsag-decision.dsag-decision-refused.open{border-left-color:var(--dsw-alias-state-error-primary,#e11d48)}
+.dsag-panel .dsag-decision-row{appearance:none;-webkit-appearance:none;box-sizing:border-box;width:100%;
+  margin:0;padding:5px 8px;border:0;border-radius:6px;background:transparent;cursor:pointer;text-align:left;
+  display:flex;flex-direction:column;gap:3px;font:inherit;color:inherit}
+.dsag-panel .dsag-decision-row:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(15,23,42,.04))}
+.dsag-panel .dsag-decision-row:focus-visible{outline:none;
+  box-shadow:0 0 0 2px rgba(79,70,229,.22);
+  box-shadow:0 0 0 2px color-mix(in srgb,var(--dsw-alias-brand-primary,#4f46e5) 22%,transparent)}
+.dsag-decision-main{display:flex;align-items:center;gap:8px;width:100%;min-width:0}
+.dsag-decision-code{flex:1 1 auto;min-width:0}
+.dsag-decision-time{flex:0 0 auto;margin-left:auto;font-size:11px;line-height:16px;
+  font-variant-numeric:tabular-nums;color:var(--dsw-alias-label-tertiary,#64748b);white-space:nowrap}
+.dsag-decision-remedy{font-size:11px;line-height:1.4;color:var(--dsw-alias-label-tertiary,#64748b);white-space:normal}
+.dsag-decision-detail{margin:0 8px 6px;padding:6px 8px;border-radius:6px;
+  border:1px solid var(--dsw-alias-border-l1,rgba(15,23,42,.1));
+  background:var(--dsw-alias-markdown-code-block,var(--dsw-alias-bg-layer-1,#f8fafc));
+  color:var(--dsw-alias-label-secondary,#475569);
+  font:11px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;font-variant-numeric:tabular-nums;
+  white-space:pre-wrap;overflow-wrap:anywhere}
 
 .dsag-update-tray{padding:8px 16px;border-top:1px solid var(--dsw-alias-border-l1,rgba(15,23,42,.08));
   background:var(--dsw-alias-bg-layer-1,#f8fafc);display:flex;flex-direction:column;gap:6px}
@@ -488,7 +605,20 @@ window.__ModuleLoader__.load({
 			const [newerAvailable, setNewerAvailable] = useState(false);
 			const [updateInfo, setUpdateInfo] = useState(null);
 			const [updateOpen, setUpdateOpen] = useState(true);
+			const [decisions, setDecisions] = useState([]);
+			const [refusedOnly, setRefusedOnly] = useState(false);
+			/** Set when this host predates the `decisions` op: an informational line, not an error. */
+			const [decisionsHint, setDecisionsHint] = useState("");
+			const [expandedDecisions, setExpandedDecisions] = useState({});
 			const loadedRef = useRef(false);
+
+			const refreshModels = useCallback(() => {
+				api("models")
+					.then((res) => {
+						if (res.ok && Array.isArray(res.models) && res.models.length > 0) setModels(res.models);
+					})
+					.catch(() => {});
+			}, []);
 
 			const load = useCallback(async () => {
 				setBusy("load");
@@ -506,9 +636,12 @@ window.__ModuleLoader__.load({
 						model: info.defaults.model,
 						effort: info.defaults.effort,
 						timeoutMin: Math.round(info.defaults.timeoutMs / 60000),
+						maxConcurrent: info.defaults.maxConcurrent !== undefined ? info.defaults.maxConcurrent : 0,
 					});
 					const list = await api("jobs", { cwd: cwd || undefined });
 					if (list.ok) setJobs(list.jobs);
+					const dec = await api("decisions", { cwd: cwd || undefined });
+					if (dec.ok && Array.isArray(dec.decisions)) setDecisions(dec.decisions);
 				} catch (e) {
 					setError(String((e && e.message) || e));
 				} finally {
@@ -518,12 +651,8 @@ window.__ModuleLoader__.load({
 
 			useEffect(() => {
 				// The CLI owns the catalog; the embedded list is only a placeholder.
-				api("models")
-					.then((res) => {
-						if (res.ok && Array.isArray(res.models) && res.models.length > 0) setModels(res.models);
-					})
-					.catch(() => {});
-			}, []);
+				refreshModels();
+			}, [refreshModels]);
 
 			useEffect(() => {
 				// Report the open panel's own layering: a covered region shows up as
@@ -560,6 +689,12 @@ window.__ModuleLoader__.load({
 
 			const save = useCallback(async () => {
 				if (draft === null) return;
+				const rawMax = draft.maxConcurrent === undefined ? 0 : draft.maxConcurrent;
+				const maxConcurrent = parseMaxConcurrent(rawMax);
+				if (maxConcurrent === null) {
+					setNotice("");
+					return;
+				}
 				setBusy("save");
 				setError("");
 				setNotice("");
@@ -570,18 +705,21 @@ window.__ModuleLoader__.load({
 							model: draft.model,
 							effort: draft.effort,
 							timeoutMs: Math.max(30000, Math.round(Number(draft.timeoutMin) * 60000)),
+							maxConcurrent: maxConcurrent,
 						},
 					});
 					if (!result.ok) throw new Error(result.error || "save failed");
 					setNotice("已保存，下次委派生效");
 					const info = await api("status");
 					if (info.ok) setStatus(info);
+					const dec = await api("decisions", { cwd: cwd || undefined });
+					if (dec.ok && Array.isArray(dec.decisions)) setDecisions(dec.decisions);
 				} catch (e) {
 					setError(String((e && e.message) || e));
 				} finally {
 					setBusy("");
 				}
-			}, [draft]);
+			}, [draft, cwd]);
 
 			const runTest = useCallback(async () => {
 				setBusy("test");
@@ -589,12 +727,33 @@ window.__ModuleLoader__.load({
 				setTestOut(null);
 				try {
 					setTestOut(await api("test", { prompt: prompt, mode: "ask", cwd: cwd || undefined }));
+					const dec = await api("decisions", { cwd: cwd || undefined });
+					if (dec.ok && Array.isArray(dec.decisions)) setDecisions(dec.decisions);
 				} catch (e) {
 					setError(String((e && e.message) || e));
 				} finally {
 					setBusy("");
 				}
 			}, [prompt, cwd]);
+
+			const refreshDecisions = useCallback(async () => {
+				setBusy("decisions");
+				try {
+					const result = await api("decisions", { cwd: cwd || undefined });
+					if (result.ok && Array.isArray(result.decisions)) {
+						setDecisions(result.decisions);
+						setDecisionsHint("");
+					} else if (/unknown op/.test(String(result.error || ""))) {
+						setDecisionsHint("重启应用后可用");
+					} else {
+						setError(result.error || "decisions failed");
+					}
+				} catch (e) {
+					setError(String((e && e.message) || e));
+				} finally {
+					setBusy("");
+				}
+			}, [cwd]);
 
 			const refreshJobs = useCallback(async () => {
 				setBusy("jobs");
@@ -706,6 +865,15 @@ window.__ModuleLoader__.load({
 			const efforts = status && status.efforts ? status.efforts : ["low", "medium", "high"];
 			const families = modelFamilies(models);
 			const cliIssue = status !== null && (!healthy || !status.companionExists) ? healthSummary : "";
+			const rawMaxConcurrent = draft === null || draft.maxConcurrent === undefined ? 0 : draft.maxConcurrent;
+			const concurrentInvalid = draft !== null && parseMaxConcurrent(rawMaxConcurrent) === null;
+			const effectiveModel = draft === null ? "" : String(draft.model || "").trim();
+			const modelUnknown = effectiveModel !== "" && !hasModelId(models, effectiveModel);
+			const reversedDecisions = Array.isArray(decisions) ? decisions.slice().reverse() : [];
+			const shownDecisions = refusedOnly
+				? reversedDecisions.filter((d) => d && d.kind === "refused")
+				: reversedDecisions;
+			const nowMs = Date.now();
 
 			return h("div", { className: "dsag-panel", role: "dialog", "aria-label": "agy" },
 				h("div", { className: "dsag-head" },
@@ -720,7 +888,10 @@ window.__ModuleLoader__.load({
 							title: "刷新",
 							"aria-label": "刷新",
 							disabled: busy !== "",
-							onClick: () => void load(),
+							onClick: () => {
+								void load();
+								refreshModels();
+							},
 						}, h(RefreshIcon, { spinning: busy === "load" })),
 						statusOk
 							? h("span", { className: "dsag-menu-wrap" },
@@ -866,7 +1037,14 @@ window.__ModuleLoader__.load({
 											? "id 自带强度，右侧「推理强度」不叠加"
 											: modelMode === "family"
 												? "将使用 " + draft.model
-												: "由模式决定，强度已写在 id 里")),
+												: "由模式决定，强度已写在 id 里"),
+									h("div", { className: "dsag-hint" },
+										models.length > 0
+											? "目录里 " + models.length + " 个 id"
+											: "目录为空（面板刷新后可用）"),
+									modelUnknown
+										? h("div", { className: "dsag-warn" }, "id 不在目录里，保存后可能被拒（model_unknown）")
+										: null),
 								h("div", { className: "dsag-toggle-bar" },
 									h("label", { className: "dsag-field dsag-field-inline" },
 										h("span", null, "超时"),
@@ -879,6 +1057,20 @@ window.__ModuleLoader__.load({
 											onChange: (e) => setDraft(Object.assign({}, draft, { timeoutMin: e.target.value })),
 										}),
 										h("span", { className: "dsag-hint" }, "分")),
+									h("label", { className: "dsag-field dsag-field-inline" },
+										h("span", null, "并发"),
+										h("input", {
+											type: "number",
+											min: 0,
+											max: 8,
+											step: 1,
+											className: concurrentInvalid ? "dsag-input-err" : undefined,
+											"aria-label": "并发上限",
+											"aria-invalid": concurrentInvalid ? "true" : undefined,
+											value: rawMaxConcurrent,
+											onChange: (e) => setDraft(Object.assign({}, draft, { maxConcurrent: e.target.value })),
+										}),
+										h("span", { className: "dsag-hint" }, "(0=不限)")),
 									h("div", { className: "dsag-spacer" }),
 									notice !== "" ? h("span", { className: "dsag-notice", title: notice }, notice) : null,
 									h("button", {
@@ -888,6 +1080,9 @@ window.__ModuleLoader__.load({
 										onClick: () => void save(),
 									}, busy === "save" ? "保存中…" : "保存"),
 								),
+								concurrentInvalid
+									? h("div", { className: "dsag-field-err", role: "alert" }, "并发上限需为 0..8 的整数（0=不限）")
+									: null,
 							),
 					),
 
@@ -917,6 +1112,74 @@ window.__ModuleLoader__.load({
 							? h("div", { className: testOut.ok ? "dsag-out" : "dsag-out dsag-out-err" },
 								testOut.output || "(无输出)")
 							: null,
+					),
+
+					h(Section, null,
+						h("div", { className: "dsag-decisions-head" },
+							h(Label, { text: decisions.length > 0 ? "决策 · " + shownDecisions.length : "决策" }),
+							h("div", { className: "dsag-spacer" }),
+							h("button", {
+								type: "button",
+								className: refusedOnly
+									? "dsag-btn dsag-btn-sm dsag-filter-btn on"
+									: "dsag-btn dsag-btn-ghost dsag-btn-sm dsag-filter-btn",
+								"aria-pressed": refusedOnly ? "true" : "false",
+								onClick: () => setRefusedOnly((prev) => !prev),
+							}, "只看拒绝"),
+							h("button", {
+								type: "button",
+								className: "dsag-btn dsag-btn-ghost",
+								disabled: busy !== "",
+								onClick: () => void refreshDecisions(),
+							}, "刷新"),
+						),
+						decisionsHint !== ""
+							? h("div", { className: "dsag-hint" }, decisionsHint)
+							: null,
+						decisions.length === 0
+							? h("div", { className: "dsag-hint dsag-empty" }, "还没有决策记录；面板里的「测试」不会写入这里")
+							: shownDecisions.length === 0
+								? h("div", { className: "dsag-hint dsag-empty" }, "没有拒绝记录")
+								: h("div", { className: "dsag-decisions" }, shownDecisions.map((entry, idx) => {
+									const rowKey = (entry && entry.id) || (String((entry && entry.at) || "") + ":" + idx);
+									const expanded = Boolean(expandedDecisions[rowKey]);
+									const kind = (entry && entry.kind) || "would_delegate";
+									const tone = decisionBadgeTone(kind);
+									const code = entry && entry.reason
+										? (typeof entry.reason === "string" ? entry.reason : (entry.reason.code || ""))
+										: "";
+									const codeLabel = code !== "" ? code : ((entry && entry.basis) || "—");
+									const remedy = kind === "refused" && code !== "" ? (REMEDY[code] || "") : "";
+									const detailPairs = expanded ? decisionDetailPairs(entry) : [];
+									const rowClass = "dsag-decision"
+										+ (kind === "refused" ? " dsag-decision-refused" : "")
+										+ (expanded ? " open" : "");
+									return h("div", { className: rowClass, key: rowKey },
+										h("button", {
+											type: "button",
+											className: "dsag-decision-row",
+											"aria-expanded": expanded ? "true" : "false",
+											onClick: () => setExpandedDecisions((prev) =>
+												Object.assign({}, prev, { [rowKey]: !prev[rowKey] })),
+										},
+											h("div", { className: "dsag-decision-main" },
+												h("span", { className: "dsag-badge dsag-badge-kind " + tone }, kind),
+												h("span", { className: "dsag-mono dsag-decision-code", title: codeLabel }, codeLabel),
+												h("span", {
+													className: "dsag-decision-time",
+													title: (entry && entry.at) || "",
+												}, formatRelativeTime(entry && entry.at, nowMs)),
+											),
+											remedy !== "" ? h("div", { className: "dsag-decision-remedy" }, remedy) : null,
+										),
+										expanded
+											? h("div", { className: "dsag-decision-detail" },
+												detailPairs.length > 0
+													? detailPairs.map((pair) => pair[0] + ": " + pair[1]).join("\n")
+													: "(无附加字段)")
+											: null,
+									);
+								})),
 					),
 
 					h(Section, null,
